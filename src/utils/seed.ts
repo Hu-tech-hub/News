@@ -103,7 +103,7 @@ export const SEED_BOOKMARKS: Bookmark[] = [
     ],
     analysisStatus: 'completed',
     analyzedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    modelId: 'gemini-3.8-flash',
+    modelId: 'gemini-3.1-flash-lite',
     promptVersion: 'v1.2.0-career-notes',
     createdAt: Date.now() - 3600000 * 24,
     updatedAt: Date.now() - 3600000 * 24,

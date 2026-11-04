@@ -81,7 +81,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     return { status: 'fetch_failed', error: fetchError };
   });
 
-  // Node 2: AI Structured Analysis Node (Runs Gemini 3.8 Flash)
+  // Node 2: AI Structured Analysis Node
   const analysisExecutionNode = new FunctionNode('gemini_structured_analysis', async (ctx, nodeInput: any) => {
     executedNodes.push('gemini_structured_analysis');
 

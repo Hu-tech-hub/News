@@ -4,8 +4,8 @@
  */
 
 export const SERVER_CONFIG = {
-  // Model selection: strictly gemini-3.8-flash for high quality reasoning & grounding
-  GEMINI_MODEL: 'gemini-3.8-flash',
+  // Lowest-cost stable Gemini model for text analysis.
+  GEMINI_MODEL: 'gemini-3.1-flash-lite',
   PROMPT_VERSION: 'v1.2.0-career-notes',
   
   // Timeouts (milliseconds)

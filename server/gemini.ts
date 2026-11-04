@@ -198,7 +198,7 @@ export async function searchRealNews(params: {
 }
 
 /**
- * Executes structured evidence-based analysis using Gemini 3.8 Flash
+ * Executes structured evidence-based analysis using the configured Gemini model.
  */
 export async function runStructuredAnalysis(params: {
   articleTitle: string;
