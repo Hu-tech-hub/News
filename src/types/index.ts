@@ -134,6 +134,27 @@ export interface SearchArticleItem {
   }>;
 }
 
+export type QuotaLimitType =
+  | 'rate_limit_rpm'
+  | 'daily_limit_rpd'
+  | 'search_grounding_limit'
+  | 'unknown_quota_type';
+
+export interface ApiQuotaError {
+  isQuotaExhausted: boolean;
+  status: number;
+  errorCode: string;
+  limitType: QuotaLimitType;
+  retryAfterSeconds?: number;
+  friendlyMessage: string;
+  diagnostics: {
+    modelUsed: string;
+    apiMethod: string;
+    usedSearchTool: boolean;
+    quotaDetails?: string;
+  };
+}
+
 export interface SearchResponse {
   articles: SearchArticleItem[];
   searchTimeKST: string;
@@ -146,6 +167,7 @@ export interface SearchResponse {
   totalFoundRaw: number;
   isGroundingLive: boolean;
   notes?: string;
+  quotaError?: ApiQuotaError;
 }
 
 export interface BackupExportData {

@@ -159,20 +159,83 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     })) {
       // Stream events through runner
     }
-  } catch (wfErr) {
+  } catch (wfErr: any) {
     console.error('ADK Workflow execution warning:', wfErr);
-    // If workflow execution caught an internal experimental error, we fall back to direct step execution
-    if (!analysisResult && currentText && currentText.length >= 100) {
-      analysisResult = await runStructuredAnalysis({
-        articleTitle: currentTitle,
+
+    const is429 =
+      wfErr?.isQuotaExhausted ||
+      wfErr?.quotaError ||
+      String(wfErr?.message).includes('429') ||
+      String(wfErr?.message).includes('RESOURCE_EXHAUSTED');
+
+    const is503 =
+      String(wfErr?.message).includes('503') ||
+      String(wfErr?.message).includes('UNAVAILABLE') ||
+      String(wfErr?.message).includes('high demand');
+
+    // CRITICAL: Do NOT attempt retry if error is 429 RESOURCE_EXHAUSTED or 503 UNAVAILABLE
+    if (is429) {
+      console.warn('[ADK Workflow] 할당량 초과(429) 감지: 추가 재시도를 즉시 차단하고 사용자에게 안내합니다.');
+      return {
+        success: false,
+        contentStatus,
         articleText: currentText,
-        sourceUrl: input.sourceUrl || null,
-        targetCompany: input.targetCompany,
-        targetRole: input.targetRole,
-        industryTags: input.industryTags,
-        sourceId,
-      });
-      analysisResult.orchestrator = 'fallback-direct';
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage: wfErr?.quotaError?.friendlyMessage || wfErr?.message || 'Gemini API 요청 한도(429 RESOURCE_EXHAUSTED)가 초과되었습니다.',
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    if (is503) {
+      console.warn('[ADK Workflow] 모델 과부하(503) 감지: 추가 재시도를 차단하고 일시적 트래픽 안내를 반환합니다.');
+      return {
+        success: false,
+        contentStatus,
+        articleText: currentText,
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage: '구글 AI 모델 일시적 과부하 (503 UNAVAILABLE): 현재 Gemini 모델 서버 트래픽이 일시적으로 급증한 상태입니다. 잠시 후 다시 시도해 주시거나, 화면의 [체험용 샘플 분석 결과 보기]를 통해 분석 UI를 바로 확인해 보세요.',
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    // Only for non-429 unexpected runtime issues, attempt direct invocation once
+    if (!analysisResult && currentText && currentText.length >= 100) {
+      try {
+        analysisResult = await runStructuredAnalysis({
+          articleTitle: currentTitle,
+          articleText: currentText,
+          sourceUrl: input.sourceUrl || null,
+          targetCompany: input.targetCompany,
+          targetRole: input.targetRole,
+          industryTags: input.industryTags,
+          sourceId,
+        });
+        analysisResult.orchestrator = 'fallback-direct';
+      } catch (fbErr: any) {
+        return {
+          success: false,
+          contentStatus,
+          articleText: currentText,
+          articleTitle: currentTitle,
+          sources: [],
+          errorMessage: fbErr?.message || '분석 중 오류가 발생했습니다.',
+          adkExecutionDetails: {
+            workflowName: jobNewsWorkflow.name,
+            nodesExecuted: executedNodes,
+            completedAt: new Date().toISOString(),
+          },
+        };
+      }
     }
   }
 

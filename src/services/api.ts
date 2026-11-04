@@ -3,8 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SearchResponse, TimeframeOption } from '../types';
+import { ApiQuotaError, SearchResponse, TimeframeOption } from '../types';
 import { WorkflowOutput } from '../../server/adk-workflow';
+
+export class ApiError extends Error {
+  quotaError?: ApiQuotaError;
+  status?: number;
+  constructor(message: string, quotaError?: ApiQuotaError, status?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.quotaError = quotaError;
+    this.status = status;
+  }
+}
 
 export interface SystemStatusResponse {
   geminiConfigured: boolean;
@@ -14,6 +25,11 @@ export interface SystemStatusResponse {
   promptVersion: string;
   searchGroundingSupported: boolean;
   statusMessage: string;
+  apiMetrics?: {
+    totalSearchApiCalls: number;
+    totalAnalysisApiCalls: number;
+    inFlightSearchesCount: number;
+  };
 }
 
 export async function getSystemStatus(): Promise<SystemStatusResponse> {
@@ -30,16 +46,21 @@ export async function searchNews(params: {
   industryTags: string[];
   extraKeyword?: string;
   timeframe: TimeframeOption;
-}): Promise<SearchResponse> {
+}, signal?: AbortSignal): Promise<SearchResponse> {
   const res = await fetch('/api/search-news', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
+    signal,
   });
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || '뉴스 검색 요청에 실패했습니다.');
+    throw new ApiError(
+      errorData.error || errorData.quotaError?.friendlyMessage || '뉴스 검색 요청에 실패했습니다.',
+      errorData.quotaError,
+      res.status
+    );
   }
 
   return res.json();

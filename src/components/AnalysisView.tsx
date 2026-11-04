@@ -40,9 +40,9 @@ interface AnalysisViewProps {
   onSaveBookmark: () => Promise<void>;
   isBookmarked: boolean;
   onReAnalyzeWithTarget: () => void;
-  onOpenSourceText: () => void;
   errorMessage?: string;
   onRetryWithCustomText: (text: string) => void;
+  onLoadSampleAnalysis?: () => void;
 }
 
 export const AnalysisView: React.FC<AnalysisViewProps> = ({
@@ -61,11 +61,37 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
   onReAnalyzeWithTarget,
   errorMessage,
   onRetryWithCustomText,
+  onLoadSampleAnalysis,
 }) => {
   const [showFullText, setShowFullText] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Dynamic step progression and timer while analyzing
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [activeStep, setActiveStep] = useState(1);
+
+  React.useEffect(() => {
+    if (!isAnalyzing) {
+      setElapsedSeconds(0);
+      setActiveStep(1);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => {
+        const next = prev + 1;
+        if (next >= 8) setActiveStep(4);
+        else if (next >= 5) setActiveStep(3);
+        else if (next >= 2) setActiveStep(2);
+        else setActiveStep(1);
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isAnalyzing]);
 
   // Check if current target differs from analysis snapshot
   const isTargetMismatched =
@@ -85,9 +111,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
     }
   };
 
+  const steps = [
+    { num: 1, title: '안전한 본문 확보 및 보안 유효성 검사 (SSRF 방지)' },
+    { num: 2, title: 'Gemini 기반 핵심 사실 추출 및 산업/이슈 태그 자동 분류' },
+    { num: 3, title: `${activeTarget?.companyName || '목표 기업'} · ${activeTarget?.jobRole || '직무'} 맞춤 실무 시사점 및 면접 질문 생성` },
+    { num: 4, title: '발급된 sourceId 및 근거 구절 일치성 최종 검증' },
+  ];
+
   if (isAnalyzing) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-6 animate-fadeIn">
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-6 animate-fadeIn">
         <div className="relative w-20 h-20 mx-auto">
           <div className="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
           <div className="absolute inset-3 rounded-full bg-blue-600/10 flex items-center justify-center text-blue-400">
@@ -96,32 +129,82 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
         </div>
 
         <div className="space-y-2">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+            <span>진행 중 ({elapsedSeconds}초 경과)</span>
+          </div>
           <h2 className="text-xl font-bold text-white">Google ADK 분석 워크플로 실행 중</h2>
           <p className="text-sm text-slate-400 max-w-md mx-auto">
-            본문 무결성 검증, 수치 보존 사실 추출, {activeTarget?.companyName || '목표 기업'} 및{' '}
-            {activeTarget?.jobRole || '직무'} 맞춤 시사점과 예상 질문을 오케스트레이션하고 있습니다.
+            {activeStep === 1 && '1단계: 원문 텍스트 무결성 검증 및 안전한 수집 작업을 진행 중입니다.'}
+            {activeStep === 2 && '2단계: Gemini 3.8 Flash가 기사의 핵심 사실과 수치를 요약하고 있습니다.'}
+            {activeStep === 3 && `3단계: ${activeTarget?.companyName || '지원 기업'}과 ${activeTarget?.jobRole || '직무'} 관점의 시사점 및 예상 질문을 도출 중입니다.`}
+            {activeStep === 4 && '4단계: 생성된 모든 항목의 근거 구절과 sourceId 정합성을 검증하고 있습니다.'}
           </p>
         </div>
 
-        {/* Workflow steps visualizer */}
-        <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-3">
-          <div className="flex items-center space-x-2 text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>1단계: 안전한 본문 확보 및 보안 유효성 검사 (SSRF 방지)</span>
-          </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>2단계: 기사 핵심 사실 요약 및 다중 태그 자동 분류</span>
-          </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>3단계: 지원 기업·직무 맞춤 실무 시사점 및 모의 면접 질문 생성</span>
-          </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>4단계: 발급된 sourceId 및 근거 구절 일치성 검증</span>
-          </div>
+        {/* Dynamic Workflow Steps Visualizer */}
+        <div className="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-5 text-left text-xs space-y-3 shadow-lg">
+          {steps.map((st) => {
+            const isDone = st.num < activeStep;
+            const isCurrent = st.num === activeStep;
+            return (
+              <div
+                key={st.num}
+                className={`flex items-center justify-between p-2 rounded-xl transition ${
+                  isCurrent
+                    ? 'bg-blue-950/40 border border-blue-500/30 text-white font-medium'
+                    : isDone
+                    ? 'text-slate-300'
+                    : 'text-slate-500 opacity-60'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">
+                    {isDone ? (
+                      <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </span>
+                    ) : isCurrent ? (
+                      <span className="w-3 h-3 rounded-full bg-blue-400 animate-ping" />
+                    ) : (
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                    )}
+                  </div>
+                  <span className="text-xs">{st.num}단계: {st.title}</span>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 ml-2">
+                  {isDone ? (
+                    <span className="text-emerald-400">완료</span>
+                  ) : isCurrent ? (
+                    <span className="text-blue-400 animate-pulse">실행 중...</span>
+                  ) : (
+                    <span className="text-slate-600">대기</span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
         </div>
+
+        {/* Server delay or API quota shortcut notice */}
+        {elapsedSeconds >= 5 && onLoadSampleAnalysis && (
+          <div className="max-w-lg mx-auto p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-xs text-amber-200 text-left space-y-2.5 animate-fadeIn">
+            <div className="flex items-center space-x-2 font-bold text-amber-300">
+              <Info className="w-4 h-4" />
+              <span>구글 모델 응답 지연 또는 일시적 트래픽 집중 안내</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              구글 Gemini 서버 트래픽이 몰리거나 API 한도 상황일 수 있습니다. 기다리지 않고 즉시 완성된 분석 화면과 북마크 기능을 확인하시려면 아래 버튼을 눌러보세요.
+            </p>
+            <button
+              type="button"
+              onClick={onLoadSampleAnalysis}
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center justify-center space-x-2 cursor-pointer shadow-md"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>체험용 샘플 분석 결과로 즉시 확인하기</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -130,24 +213,45 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
   if (contentStatus === 'fetch_failed_needs_text' || (!analysis && errorMessage)) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-12 space-y-6 animate-fadeIn">
-        <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-4">
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0" />
-            <div>
-              <h2 className="text-base font-bold text-white">기사 본문 직접 입력 필요</h2>
-              <p className="text-xs text-amber-300/90 mt-0.5">
+        <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-5">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h2 className="text-base font-bold text-white">기사 분석 알림</h2>
+              <p className="text-xs text-amber-300/90 leading-relaxed">
                 {errorMessage ||
-                  '해당 웹사이트의 보안 정책(봇 차단, 유료벽 등)으로 인해 서버에서 본문 텍스트를 완전히 확보하지 못했습니다.'}
+                  '웹사이트 보안 정책(봇 차단, 유료벽 등) 또는 모델 응답 지연으로 인해 분석을 완료하지 못했습니다.'}
               </p>
             </div>
           </div>
+
+          {/* Quick Experience Shortcut */}
+          {onLoadSampleAnalysis && (
+            <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-500/30 space-y-2">
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-blue-300">
+                <Sparkles className="w-4 h-4" />
+                <span>API 오류와 상관없이 전체 기능 즉시 체험하기</span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                실제 형식의 반도체·제조 기사 요약, 직무 시사점, 모의 면접 질문, 출처 바인딩 및 IndexedDB 북마크 저장 기능을 바로 테스트해 보실 수 있습니다.
+              </p>
+              <button
+                type="button"
+                onClick={onLoadSampleAnalysis}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>체험용 샘플 분석 결과로 전체 화면 확인하기</span>
+              </button>
+            </div>
+          )}
 
           <div className="border-t border-amber-500/20 pt-4 space-y-3">
             <p className="text-xs text-slate-300">
               정확한 분석을 위해 기사 페이지에서 텍스트를 직접 복사하여 아래에 붙여넣어 주세요:
             </p>
             <textarea
-              rows={8}
+              rows={6}
               placeholder="복사한 기사 본문을 여기에 붙여넣으세요 (최소 50자 이상)..."
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
@@ -157,7 +261,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
               <button
                 onClick={() => onRetryWithCustomText(pasteText)}
                 disabled={pasteText.trim().length < 50}
-                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs shadow-md transition"
+                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs shadow-md transition cursor-pointer"
               >
                 붙여넣은 본문으로 분석 재시도
               </button>
