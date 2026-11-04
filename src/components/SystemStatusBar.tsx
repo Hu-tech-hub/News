@@ -26,7 +26,7 @@ export const SystemStatusBar: React.FC<SystemStatusBarProps> = ({ status, onLoad
               }`}
             />
             <span className="font-semibold text-slate-300">
-              Gemini 3.8 Flash: {status?.geminiConfigured ? '연동 완료' : 'API 키 미설정 (Secrets 패널 필요)'}
+              {status?.model || 'Gemini'}: {status?.geminiConfigured ? '연동 완료' : 'API 키 미설정 (Secrets 패널 필요)'}
             </span>
           </div>
 

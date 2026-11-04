@@ -70,24 +70,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
 
   // Dynamic step progression and timer while analyzing
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [activeStep, setActiveStep] = useState(1);
-
   React.useEffect(() => {
     if (!isAnalyzing) {
       setElapsedSeconds(0);
-      setActiveStep(1);
       return;
     }
 
     const timer = setInterval(() => {
-      setElapsedSeconds((prev) => {
-        const next = prev + 1;
-        if (next >= 8) setActiveStep(4);
-        else if (next >= 5) setActiveStep(3);
-        else if (next >= 2) setActiveStep(2);
-        else setActiveStep(1);
-        return next;
-      });
+      setElapsedSeconds((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(timer);
@@ -111,13 +101,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
     }
   };
 
-  const steps = [
-    { num: 1, title: '안전한 본문 확보 및 보안 유효성 검사 (SSRF 방지)' },
-    { num: 2, title: 'Gemini 기반 핵심 사실 추출 및 산업/이슈 태그 자동 분류' },
-    { num: 3, title: `${activeTarget?.companyName || '목표 기업'} · ${activeTarget?.jobRole || '직무'} 맞춤 실무 시사점 및 면접 질문 생성` },
-    { num: 4, title: '발급된 sourceId 및 근거 구절 일치성 최종 검증' },
-  ];
-
   if (isAnalyzing) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-6 animate-fadeIn">
@@ -132,57 +115,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
             <span>진행 중 ({elapsedSeconds}초 경과)</span>
           </div>
-          <h2 className="text-xl font-bold text-white">Google ADK 분석 워크플로 실행 중</h2>
+          <h2 className="text-xl font-bold text-white">기사 분석 요청 처리 중</h2>
           <p className="text-sm text-slate-400 max-w-md mx-auto">
-            {activeStep === 1 && '1단계: 원문 텍스트 무결성 검증 및 안전한 수집 작업을 진행 중입니다.'}
-            {activeStep === 2 && '2단계: Gemini 3.8 Flash가 기사의 핵심 사실과 수치를 요약하고 있습니다.'}
-            {activeStep === 3 && `3단계: ${activeTarget?.companyName || '지원 기업'}과 ${activeTarget?.jobRole || '직무'} 관점의 시사점 및 예상 질문을 도출 중입니다.`}
-            {activeStep === 4 && '4단계: 생성된 모든 항목의 근거 구절과 sourceId 정합성을 검증하고 있습니다.'}
+            기사 본문을 확인한 뒤 {activeTarget?.companyName || '목표 기업'} 및{' '}
+            {activeTarget?.jobRole || '직무'}에 맞춰 분석하고 있습니다. Gemini 응답까지 잠시 걸릴 수 있습니다.
           </p>
         </div>
 
-        {/* Dynamic Workflow Steps Visualizer */}
-        <div className="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-5 text-left text-xs space-y-3 shadow-lg">
-          {steps.map((st) => {
-            const isDone = st.num < activeStep;
-            const isCurrent = st.num === activeStep;
-            return (
-              <div
-                key={st.num}
-                className={`flex items-center justify-between p-2 rounded-xl transition ${
-                  isCurrent
-                    ? 'bg-blue-950/40 border border-blue-500/30 text-white font-medium'
-                    : isDone
-                    ? 'text-slate-300'
-                    : 'text-slate-500 opacity-60'
-                }`}
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {isDone ? (
-                      <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
-                        <Check className="w-3 h-3 stroke-[3]" />
-                      </span>
-                    ) : isCurrent ? (
-                      <span className="w-3 h-3 rounded-full bg-blue-400 animate-ping" />
-                    ) : (
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-                    )}
-                  </div>
-                  <span className="text-xs">{st.num}단계: {st.title}</span>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 ml-2">
-                  {isDone ? (
-                    <span className="text-emerald-400">완료</span>
-                  ) : isCurrent ? (
-                    <span className="text-blue-400 animate-pulse">실행 중...</span>
-                  ) : (
-                    <span className="text-slate-600">대기</span>
-                  )}
-                </span>
-              </div>
-            );
-          })}
+        <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
+          현재 단계별 진행 상황은 화면에 실시간 표시되지 않습니다. 요청이 완료되거나 시간 제한에 도달하면 결과를 표시합니다.
         </div>
 
         {/* Server delay or API quota shortcut notice */}

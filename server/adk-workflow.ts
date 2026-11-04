@@ -46,13 +46,14 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
   let contentStatus: ContentStatus = input.articleText ? 'user_provided_text' : 'partial_text';
   let fetchError: string | undefined = undefined;
   let analysisResult: AnalysisResult | undefined = undefined;
+  let analysisNodeStarted = false;
 
   // Node 1: Input Validation and Safe Content Retrieval
   const inputValidationNode = new FunctionNode('input_validation_and_fetch', async (ctx, nodeInput: any) => {
     executedNodes.push('input_validation_and_fetch');
 
     // Case A: User provided direct text
-    if (input.articleText && input.articleText.trim().length >= 100) {
+    if (input.articleText && input.articleText.trim().length >= 50) {
       currentText = input.articleText.trim();
       contentStatus = input.inputType === 'text' ? 'user_provided_text' : 'full_text_fetched';
       return { status: 'text_ready' };
@@ -80,14 +81,15 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     return { status: 'fetch_failed', error: fetchError };
   });
 
-  // Node 2: AI Structured Analysis Node (Runs Gemini 3.8 Flash)
+  // Node 2: AI Structured Analysis Node
   const analysisExecutionNode = new FunctionNode('gemini_structured_analysis', async (ctx, nodeInput: any) => {
     executedNodes.push('gemini_structured_analysis');
 
-    if (contentStatus === 'fetch_failed_needs_text' || !currentText || currentText.length < 100) {
+    if (contentStatus === 'fetch_failed_needs_text' || !currentText || currentText.length < 50) {
       return { status: 'skipped' };
     }
 
+    analysisNodeStarted = true;
     const result = await runStructuredAnalysis({
       articleTitle: currentTitle,
       articleText: currentText,
@@ -137,7 +139,6 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
   // Construct ADK Workflow with linear chain: START -> Input -> Analysis -> Validation
   const jobNewsWorkflow = new Workflow({
     name: 'job_news_analysis_workflow',
-    nodes: [inputValidationNode, analysisExecutionNode, validationAndGroundingNode],
     edges: [
       [START, inputValidationNode, analysisExecutionNode, validationAndGroundingNode],
     ],
@@ -159,19 +160,23 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     })) {
       // Stream events through runner
     }
-  } catch (wfErr: any) {
+  } catch (wfErr: unknown) {
     console.error('ADK Workflow execution warning:', wfErr);
-
+    const error = wfErr instanceof Error ? wfErr : new Error(String(wfErr));
+    const errorDetails = wfErr as {
+      isQuotaExhausted?: boolean;
+      quotaError?: { friendlyMessage?: string };
+    };
+    const errorMessage = error.message;
     const is429 =
-      wfErr?.isQuotaExhausted ||
-      wfErr?.quotaError ||
-      String(wfErr?.message).includes('429') ||
-      String(wfErr?.message).includes('RESOURCE_EXHAUSTED');
-
+      errorDetails?.isQuotaExhausted ||
+      errorDetails?.quotaError ||
+      errorMessage.includes('429') ||
+      errorMessage.includes('RESOURCE_EXHAUSTED');
     const is503 =
-      String(wfErr?.message).includes('503') ||
-      String(wfErr?.message).includes('UNAVAILABLE') ||
-      String(wfErr?.message).includes('high demand');
+      errorMessage.includes('503') ||
+      errorMessage.includes('UNAVAILABLE') ||
+      errorMessage.includes('high demand');
 
     // CRITICAL: Do NOT attempt retry if error is 429 RESOURCE_EXHAUSTED or 503 UNAVAILABLE
     if (is429) {
@@ -182,7 +187,10 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
         articleText: currentText,
         articleTitle: currentTitle,
         sources: [],
-        errorMessage: wfErr?.quotaError?.friendlyMessage || wfErr?.message || 'Gemini API 요청 한도(429 RESOURCE_EXHAUSTED)가 초과되었습니다.',
+        errorMessage:
+          errorDetails?.quotaError?.friendlyMessage ||
+          errorMessage ||
+          'Gemini API 요청 한도(429 RESOURCE_EXHAUSTED)가 초과되었습니다.',
         adkExecutionDetails: {
           workflowName: jobNewsWorkflow.name,
           nodesExecuted: executedNodes,
@@ -208,8 +216,24 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
       };
     }
 
-    // Only for non-429 unexpected runtime issues, attempt direct invocation once
-    if (!analysisResult && currentText && currentText.length >= 100) {
+    // Never repeat a Gemini request that already started inside the workflow.
+    if (analysisNodeStarted) {
+      return {
+        success: false,
+        contentStatus,
+        articleText: currentText,
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage,
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    if (!analysisResult && currentText.trim().length >= 50) {
       try {
         analysisResult = await runStructuredAnalysis({
           articleTitle: currentTitle,
@@ -221,14 +245,14 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
           sourceId,
         });
         analysisResult.orchestrator = 'fallback-direct';
-      } catch (fbErr: any) {
+      } catch (fbErr: unknown) {
         return {
           success: false,
           contentStatus,
           articleText: currentText,
           articleTitle: currentTitle,
           sources: [],
-          errorMessage: fbErr?.message || '분석 중 오류가 발생했습니다.',
+          errorMessage: fbErr instanceof Error ? fbErr.message : '분석 중 오류가 발생했습니다.',
           adkExecutionDetails: {
             workflowName: jobNewsWorkflow.name,
             nodesExecuted: executedNodes,
@@ -237,6 +261,27 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
         };
       }
     }
+  }
+
+  if (!analysisResult && !fetchError && currentText.trim().length >= 50) {
+    if (analysisNodeStarted) {
+      throw new Error('ADK 분석 단계가 완료되지 않았습니다.');
+    }
+    analysisResult = await runStructuredAnalysis({
+      articleTitle: currentTitle,
+      articleText: currentText,
+      sourceUrl: input.sourceUrl || null,
+      targetCompany: input.targetCompany,
+      targetRole: input.targetRole,
+      industryTags: input.industryTags,
+      sourceId,
+    });
+    analysisResult.orchestrator = 'fallback-direct';
+  }
+
+  if (!analysisResult && !fetchError) {
+    fetchError = '분석하려면 기사 본문을 50자 이상 입력해 주세요.';
+    contentStatus = 'fetch_failed_needs_text';
   }
 
   // Construct source item

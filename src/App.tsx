@@ -390,7 +390,6 @@ export default function App() {
             onSaveBookmark={handleSaveBookmark}
             isBookmarked={isCurrentBookmarked}
             onReAnalyzeWithTarget={handleReAnalyzeWithTarget}
-            onOpenSourceText={() => {}}
             errorMessage={analysisError}
             onRetryWithCustomText={(text) => {
               handleAnalyzeArticle({

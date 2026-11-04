@@ -23,7 +23,7 @@ apiRouter.get('/system-status', (_req: Request, res: Response) => {
     searchGroundingSupported: geminiReady,
     apiMetrics: getApiCallMetrics(),
     statusMessage: geminiReady
-      ? 'Gemini 3.8 Flash 및 Google ADK 워크플로가 정상 가동 중입니다.'
+      ? `${SERVER_CONFIG.GEMINI_MODEL} 및 Google ADK 워크플로가 정상 가동 중입니다.`
       : 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다. 실시간 검색 및 분석을 위해 API 키가 필요합니다.',
   });
 });

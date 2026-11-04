@@ -193,8 +193,10 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
     setSearchResponse({
       articles: sample,
       searchTimeKST: formatToKST(new Date(), 'datetime'),
-      timeframe: selectedTimeframe,
+      timeframe,
       queryUsed: `${activeTarget?.companyName || '삼성전자'} ${activeTarget?.jobRole || '엔지니어링'} (체험용 샘플)`,
+      targetCompany: activeTarget?.companyName || '삼성전자',
+      targetRole: activeTarget?.jobRole || '엔지니어링',
       excludedCountMissingDate: 0,
       excludedCountOutOfRange: 0,
       totalFoundRaw: sample.length,
