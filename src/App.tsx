@@ -205,6 +205,33 @@ export default function App() {
     });
   };
 
+  // Load sample grounded analysis immediately to verify full UI flow
+  const handleLoadSampleAnalysis = () => {
+    const seed = SEED_BOOKMARKS[0];
+    const targetComp = activeTarget?.companyName || '삼성전자';
+    const targetRole = activeTarget?.jobRole || '반도체 공정설계 (메모리사업부)';
+    const targetTags = activeTarget?.industryTags || ['반도체', '제조/장비'];
+
+    setCurrentArticleTitle(seed.title);
+    setCurrentSourceUrl(seed.sourceUrl);
+    setCurrentPublisher(seed.publisher);
+    setCurrentPublishedAt(seed.publishedAt);
+    setCurrentContentStatus('full_text_fetched');
+    setCurrentArticleText(seed.articleText);
+    setCurrentSources(seed.sources);
+    setCurrentAnalysis({
+      ...seed,
+      targetSnapshot: {
+        companyName: targetComp,
+        jobRole: targetRole,
+        industryTags: targetTags,
+      },
+      orchestrator: 'google-adk-workflow',
+    });
+    setAnalysisError(undefined);
+    setIsAnalyzing(false);
+  };
+
   // Save Bookmark into IndexedDB
   const handleSaveBookmark = async () => {
     if (!currentAnalysis) return;
@@ -363,7 +390,6 @@ export default function App() {
             onSaveBookmark={handleSaveBookmark}
             isBookmarked={isCurrentBookmarked}
             onReAnalyzeWithTarget={handleReAnalyzeWithTarget}
-            onOpenSourceText={() => {}}
             errorMessage={analysisError}
             onRetryWithCustomText={(text) => {
               handleAnalyzeArticle({
@@ -373,6 +399,7 @@ export default function App() {
                 inputType: 'text',
               });
             }}
+            onLoadSampleAnalysis={handleLoadSampleAnalysis}
           />
         )}
 

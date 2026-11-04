@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Search,
   Calendar,
@@ -20,9 +20,21 @@ import {
   Building,
   Briefcase,
   RefreshCw,
+  AlertTriangle,
+  Info,
+  ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
-import { SearchArticleItem, SearchResponse, TargetProfile, TimeframeOption } from '../types';
+import {
+  ApiQuotaError,
+  SearchArticleItem,
+  SearchResponse,
+  TargetProfile,
+  TimeframeOption,
+} from '../types';
 import { formatToKST } from '../utils/date';
+import { ApiError } from '../services/api';
+import { getSampleSearchArticles, getSampleArticleText } from '../utils/seed';
 
 interface SearchNewsViewProps {
   activeTarget: TargetProfile | null;
@@ -56,6 +68,11 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchResponse, setSearchResponse] = useState<SearchResponse | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [quotaError, setQuotaError] = useState<ApiQuotaError | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+
+  // Synchronous ref lock to prevent duplicate rapid clicks or Enter key bounces
+  const isSearchingRef = useRef(false);
 
   // Manual URL input state
   const [directUrl, setDirectUrl] = useState('');
@@ -68,6 +85,21 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
 
   // Accordion open sets for related coverage
   const [expandedRelated, setExpandedRelated] = useState<Set<string>>(new Set());
+
+  // Countdown timer effect for Retry-After
+  useEffect(() => {
+    if (countdownSeconds === null || countdownSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setCountdownSeconds((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [countdownSeconds]);
 
   const toggleRelated = (articleId: string) => {
     const next = new Set(expandedRelated);
@@ -82,9 +114,17 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
       return;
     }
 
+    // Guard: Drop parallel or repeated clicks immediately
+    if (isSearchingRef.current || isSearching) {
+      console.warn('[뉴스 찾기] 이미 요청이 진행 중이므로 중복 호출을 차단합니다.');
+      return;
+    }
+
     const tf = overrideTimeframe || timeframe;
+    isSearchingRef.current = true;
     setIsSearching(true);
     setSearchError(null);
+    setQuotaError(null);
 
     try {
       const resp = await onPerformSearch({
@@ -94,12 +134,25 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
         extraKeyword: extraKeyword.trim(),
         timeframe: tf,
       });
+
       setSearchResponse(resp);
       if (overrideTimeframe) setTimeframe(overrideTimeframe);
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : '뉴스 검색 중 오류가 발생했습니다.');
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.quotaError) {
+        setQuotaError(err.quotaError);
+        setSearchError(null);
+        if (err.quotaError.retryAfterSeconds && err.quotaError.retryAfterSeconds > 0) {
+          setCountdownSeconds(err.quotaError.retryAfterSeconds);
+        } else {
+          setCountdownSeconds(null);
+        }
+      } else {
+        setSearchError(err instanceof Error ? err.message : '뉴스 검색 중 오류가 발생했습니다.');
+        setQuotaError(null);
+      }
     } finally {
       setIsSearching(false);
+      isSearchingRef.current = false;
     }
   };
 
@@ -133,6 +186,34 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
       articleText: directTextContent.trim(),
       inputType: 'text',
     });
+  };
+
+  const handleLoadSampleArticles = () => {
+    const sample = getSampleSearchArticles(activeTarget);
+    setSearchResponse({
+      articles: sample,
+      searchTimeKST: formatToKST(new Date(), 'datetime'),
+      timeframe,
+      queryUsed: `${activeTarget?.companyName || '삼성전자'} ${activeTarget?.jobRole || '엔지니어링'} (체험용 샘플)`,
+      targetCompany: activeTarget?.companyName || '삼성전자',
+      targetRole: activeTarget?.jobRole || '엔지니어링',
+      excludedCountMissingDate: 0,
+      excludedCountOutOfRange: 0,
+      totalFoundRaw: sample.length,
+      isGroundingLive: false,
+      notes: 'API 429 한도 초과 시에도 기능 및 북마크를 바로 테스트해 보실 수 있도록 제공되는 체험용 샘플 기사입니다.',
+    });
+    setQuotaError(null);
+    setSearchError(null);
+  };
+
+  const handleFillSampleDirectText = () => {
+    const sample = getSampleArticleText(activeTarget);
+    setActiveInputMode('text');
+    setDirectTextTitle(sample.title);
+    setDirectTextUrl(sample.url);
+    setDirectTextContent(sample.text);
+    setQuotaError(null);
   };
 
   if (!activeTarget) {
@@ -426,8 +507,121 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
         </form>
       )}
 
-      {/* Search Error */}
-      {searchError && (
+      {/* 429 RESOURCE_EXHAUSTED Quota Diagnostic Card */}
+      {quotaError && (
+        <div className="p-5 rounded-2xl bg-amber-950/30 border border-amber-500/40 shadow-lg space-y-4 animate-fadeIn">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start space-x-3">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-sm font-bold text-amber-200">
+                    요청 한도 초과 (429 RESOURCE_EXHAUSTED)
+                  </h3>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {quotaError.limitType === 'search_grounding_limit'
+                      ? 'Google Search 도구 한도'
+                      : quotaError.limitType === 'rate_limit_rpm'
+                      ? '분당 요청 한도 (RPM)'
+                      : quotaError.limitType === 'daily_limit_rpd'
+                      ? '일일 요청 한도 (RPD)'
+                      : '원인 미확정 (한도 종류 불명)'}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-300/90 mt-1 leading-relaxed">
+                  {quotaError.friendlyMessage}
+                </p>
+              </div>
+            </div>
+
+            {/* Manual Retry Button with optional countdown */}
+            <button
+              onClick={() => handleSearch()}
+              disabled={isSearching || (countdownSeconds !== null && countdownSeconds > 0)}
+              className="shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold shadow-md transition cursor-pointer"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin' : ''}`} />
+              <span>
+                {countdownSeconds !== null && countdownSeconds > 0
+                  ? `${countdownSeconds}초 후 재시도 가능`
+                  : '수동 재시도'}
+              </span>
+            </button>
+          </div>
+
+          {/* Technical Diagnostics Box (Without leaking any secrets or keys) */}
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 space-y-2">
+            <div className="font-semibold text-slate-200 flex items-center space-x-1.5">
+              <Info className="w-4 h-4 text-blue-400" />
+              <span>진단 정보 (API 키 및 비밀값 제외)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+              <div>
+                호출 모델: <strong className="text-slate-200">{quotaError.diagnostics.modelUsed}</strong>
+              </div>
+              <div>
+                호출 메서드: <code className="text-slate-300">{quotaError.diagnostics.apiMethod}</code>
+              </div>
+              <div>
+                Search 도구 사용 여부:{' '}
+                <strong className={quotaError.diagnostics.usedSearchTool ? 'text-amber-300' : 'text-slate-200'}>
+                  {quotaError.diagnostics.usedSearchTool ? '사용함 (Google Search Grounding)' : '사용 안 함'}
+                </strong>
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              판정 상태:{' '}
+              {quotaError.limitType === 'unknown_quota_type' ? (
+                <span className="text-amber-300">
+                  원인 미확정 (수신된 오류 정보만으로는 Gemini 모델의 분당/일일 한도인지, Google Search 도구의 쿼리 한도인지 확정할 수 없음)
+                </span>
+              ) : (
+                <span className="text-slate-200">{quotaError.limitType}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Alternative Path & Offline Feature Assurance */}
+          <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/40 text-xs space-y-2">
+            <div className="font-semibold text-blue-300 flex items-center space-x-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>대체 경로 및 이용 가능 기능 안내</span>
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+              <li>
+                <strong>직접 입력 기사 분석:</strong> Search 도구 한도만 소진된 경우라면 [URL 입력] 또는 [본문 직접 붙여넣기]를 통한 분석이 가능할 수 있습니다. (단, 모델 자체 한도가 소진된 경우라면 본문 분석도 429 오류가 발생할 수 있습니다.)
+              </li>
+              <li>
+                <strong>API 무관 오프라인 기능:</strong> 이미 저장된 북마크 조회, 키워드 검색, 태그 필터링, 개인 메모 작성 및 JSON 백업/복원 기능은 외부 API 호출 없이 브라우저 로컬(IndexedDB)에서 100% 정상 작동합니다.
+              </li>
+            </ul>
+
+            <div className="pt-2 border-t border-blue-900/40 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleLoadSampleArticles}
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition flex items-center space-x-1.5 cursor-pointer shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>체험용 샘플 기사 목록 불러오기</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleFillSampleDirectText}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 transition flex items-center space-x-1.5 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>[기사 직접 입력]에 예시 채우기</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* General Search Error (Non-Quota) */}
+      {searchError && !quotaError && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start space-x-2.5">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <div>
@@ -478,7 +672,8 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
               {searchResponse.timeframe !== 'last_30_days' && (
                 <button
                   onClick={() => handleSearch('last_30_days')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 hover:text-white border border-slate-700 font-medium transition"
+                  disabled={isSearching}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-blue-300 hover:text-white border border-slate-700 font-medium transition cursor-pointer"
                 >
                   최근 30일로 넓히기
                 </button>
@@ -502,6 +697,16 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
                 필터 기간을 '최근 30일'로 넓히거나, 추가 키워드를 변경해 보세요. 또는 관심 있는 기사 URL이나 본문을 직접
                 입력하여 분석할 수 있습니다.
               </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleLoadSampleArticles}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <span>체험용 샘플 기사 목록 불러오기</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

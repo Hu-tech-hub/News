@@ -110,3 +110,50 @@ export const SEED_BOOKMARKS: Bookmark[] = [
     userNotes: '삼성전자 메모리사업부 1차 면접 전 HBM4 베이스다이 로직 공정 전환 이슈 숙지할 것!',
   },
 ];
+
+export function getSampleSearchArticles(target?: TargetProfile | null): import('../types').SearchArticleItem[] {
+  const comp = target?.companyName || '삼성전자';
+  const role = target?.jobRole || '엔지니어링';
+  const now = Date.now();
+  return [
+    {
+      id: `sample-search-1-${now}`,
+      title: `[기획] ${comp}, 차세대 공정 라인 장비 발주 확대 및 수율 안정화 가속`,
+      publisher: '전자신문',
+      sourceUrl: 'https://www.etnews.com/news/sample-fab-expansion',
+      publishedAt: new Date(now - 3600000 * 24).toISOString().slice(0, 10),
+      publishedDatePrecision: 'date',
+      relationType: 'company_direct',
+      selectionReason: `${comp} 직접 투자 및 설비 구축 관련 최신 핵심 동향`,
+    },
+    {
+      id: `sample-search-2-${now}`,
+      title: `글로벌 공급망 재편 속 ${role} 직무 관점의 핵심 품질·공정 과제 진단`,
+      publisher: '한국경제',
+      sourceUrl: 'https://www.hankyung.com/economy/sample-supply-chain',
+      publishedAt: new Date(now - 3600000 * 48).toISOString().slice(0, 10),
+      publishedDatePrecision: 'date',
+      relationType: 'industry_role',
+      selectionReason: `${role} 지원 직무와 직결되는 공정 및 기술 트렌드`,
+    },
+    {
+      id: `sample-search-3-${now}`,
+      title: `주요 테크·제조 기업 분기 실적 발표 및 신성장 동력 R&D 로드맵 공개`,
+      publisher: '매일경제',
+      sourceUrl: 'https://www.mk.co.kr/news/sample-tech-rd',
+      publishedAt: new Date(now - 3600000 * 72).toISOString().slice(0, 10),
+      publishedDatePrecision: 'date',
+      relationType: 'company_direct',
+      selectionReason: `경영 전략 및 차세대 기술군 개발 방향성 파악`,
+    },
+  ];
+}
+
+export function getSampleArticleText(target?: TargetProfile | null): { title: string; url: string; text: string } {
+  const comp = target?.companyName || '삼성전자';
+  return {
+    title: `${comp}, 차세대 고성능 반도체 및 첨단 패키징 라인 대규모 투자 발표`,
+    url: 'https://www.etnews.com/sample-article',
+    text: `${comp}가 차세대 고성능 칩 양산을 위해 첨단 공정 클린룸 및 신규 설비 증설 계획을 확정 발표했다. 업계에 따르면 이번 투자는 차세대 패키징 수율을 극대화하고 전력 효율을 25% 개선하는 신소재 공정을 도입하는 데 초점이 맞춰져 있다. 관계자는 "글로벌 고객사의 맞춤형 요구에 적기 대응하기 위해 선행 R&D 및 제조 품질 표준화 체계를 구축할 것"이라고 밝혔다. 이는 급증하는 고대역폭 메모리와 AI 가속기 시장에서의 점유율 방어 및 주도권 확보를 위한 핵심 행보로 분석된다.`,
+  };
+}

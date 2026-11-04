@@ -160,24 +160,106 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     })) {
       // Stream events through runner
     }
-  } catch (wfErr) {
+  } catch (wfErr: unknown) {
     console.error('ADK Workflow execution warning:', wfErr);
-    // Do not retry a Gemini request that already started inside the workflow.
-    if (analysisNodeStarted) {
-      throw wfErr;
+    const error = wfErr instanceof Error ? wfErr : new Error(String(wfErr));
+    const errorDetails = wfErr as {
+      isQuotaExhausted?: boolean;
+      quotaError?: { friendlyMessage?: string };
+    };
+    const errorMessage = error.message;
+    const is429 =
+      errorDetails?.isQuotaExhausted ||
+      errorDetails?.quotaError ||
+      errorMessage.includes('429') ||
+      errorMessage.includes('RESOURCE_EXHAUSTED');
+    const is503 =
+      errorMessage.includes('503') ||
+      errorMessage.includes('UNAVAILABLE') ||
+      errorMessage.includes('high demand');
+
+    // CRITICAL: Do NOT attempt retry if error is 429 RESOURCE_EXHAUSTED or 503 UNAVAILABLE
+    if (is429) {
+      console.warn('[ADK Workflow] 할당량 초과(429) 감지: 추가 재시도를 즉시 차단하고 사용자에게 안내합니다.');
+      return {
+        success: false,
+        contentStatus,
+        articleText: currentText,
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage:
+          errorDetails?.quotaError?.friendlyMessage ||
+          errorMessage ||
+          'Gemini API 요청 한도(429 RESOURCE_EXHAUSTED)가 초과되었습니다.',
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
     }
 
-    if (currentText.trim().length >= 50) {
-      analysisResult = await runStructuredAnalysis({
-        articleTitle: currentTitle,
+    if (is503) {
+      console.warn('[ADK Workflow] 모델 과부하(503) 감지: 추가 재시도를 차단하고 일시적 트래픽 안내를 반환합니다.');
+      return {
+        success: false,
+        contentStatus,
         articleText: currentText,
-        sourceUrl: input.sourceUrl || null,
-        targetCompany: input.targetCompany,
-        targetRole: input.targetRole,
-        industryTags: input.industryTags,
-        sourceId,
-      });
-      analysisResult.orchestrator = 'fallback-direct';
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage: '구글 AI 모델 일시적 과부하 (503 UNAVAILABLE): 현재 Gemini 모델 서버 트래픽이 일시적으로 급증한 상태입니다. 잠시 후 다시 시도해 주시거나, 화면의 [체험용 샘플 분석 결과 보기]를 통해 분석 UI를 바로 확인해 보세요.',
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    // Never repeat a Gemini request that already started inside the workflow.
+    if (analysisNodeStarted) {
+      return {
+        success: false,
+        contentStatus,
+        articleText: currentText,
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage,
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    if (!analysisResult && currentText.trim().length >= 50) {
+      try {
+        analysisResult = await runStructuredAnalysis({
+          articleTitle: currentTitle,
+          articleText: currentText,
+          sourceUrl: input.sourceUrl || null,
+          targetCompany: input.targetCompany,
+          targetRole: input.targetRole,
+          industryTags: input.industryTags,
+          sourceId,
+        });
+        analysisResult.orchestrator = 'fallback-direct';
+      } catch (fbErr: unknown) {
+        return {
+          success: false,
+          contentStatus,
+          articleText: currentText,
+          articleTitle: currentTitle,
+          sources: [],
+          errorMessage: fbErr instanceof Error ? fbErr.message : '분석 중 오류가 발생했습니다.',
+          adkExecutionDetails: {
+            workflowName: jobNewsWorkflow.name,
+            nodesExecuted: executedNodes,
+            completedAt: new Date().toISOString(),
+          },
+        };
+      }
     }
   }
 
