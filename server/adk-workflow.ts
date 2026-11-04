@@ -46,13 +46,14 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
   let contentStatus: ContentStatus = input.articleText ? 'user_provided_text' : 'partial_text';
   let fetchError: string | undefined = undefined;
   let analysisResult: AnalysisResult | undefined = undefined;
+  let analysisNodeStarted = false;
 
   // Node 1: Input Validation and Safe Content Retrieval
   const inputValidationNode = new FunctionNode('input_validation_and_fetch', async (ctx, nodeInput: any) => {
     executedNodes.push('input_validation_and_fetch');
 
     // Case A: User provided direct text
-    if (input.articleText && input.articleText.trim().length >= 100) {
+    if (input.articleText && input.articleText.trim().length >= 50) {
       currentText = input.articleText.trim();
       contentStatus = input.inputType === 'text' ? 'user_provided_text' : 'full_text_fetched';
       return { status: 'text_ready' };
@@ -84,10 +85,11 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
   const analysisExecutionNode = new FunctionNode('gemini_structured_analysis', async (ctx, nodeInput: any) => {
     executedNodes.push('gemini_structured_analysis');
 
-    if (contentStatus === 'fetch_failed_needs_text' || !currentText || currentText.length < 100) {
+    if (contentStatus === 'fetch_failed_needs_text' || !currentText || currentText.length < 50) {
       return { status: 'skipped' };
     }
 
+    analysisNodeStarted = true;
     const result = await runStructuredAnalysis({
       articleTitle: currentTitle,
       articleText: currentText,
@@ -137,7 +139,6 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
   // Construct ADK Workflow with linear chain: START -> Input -> Analysis -> Validation
   const jobNewsWorkflow = new Workflow({
     name: 'job_news_analysis_workflow',
-    nodes: [inputValidationNode, analysisExecutionNode, validationAndGroundingNode],
     edges: [
       [START, inputValidationNode, analysisExecutionNode, validationAndGroundingNode],
     ],
@@ -161,8 +162,12 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     }
   } catch (wfErr) {
     console.error('ADK Workflow execution warning:', wfErr);
-    // If workflow execution caught an internal experimental error, we fall back to direct step execution
-    if (!analysisResult && currentText && currentText.length >= 100) {
+    // Do not retry a Gemini request that already started inside the workflow.
+    if (analysisNodeStarted) {
+      throw wfErr;
+    }
+
+    if (currentText.trim().length >= 50) {
       analysisResult = await runStructuredAnalysis({
         articleTitle: currentTitle,
         articleText: currentText,
@@ -174,6 +179,27 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
       });
       analysisResult.orchestrator = 'fallback-direct';
     }
+  }
+
+  if (!analysisResult && !fetchError && currentText.trim().length >= 50) {
+    if (analysisNodeStarted) {
+      throw new Error('ADK 분석 단계가 완료되지 않았습니다.');
+    }
+    analysisResult = await runStructuredAnalysis({
+      articleTitle: currentTitle,
+      articleText: currentText,
+      sourceUrl: input.sourceUrl || null,
+      targetCompany: input.targetCompany,
+      targetRole: input.targetRole,
+      industryTags: input.industryTags,
+      sourceId,
+    });
+    analysisResult.orchestrator = 'fallback-direct';
+  }
+
+  if (!analysisResult && !fetchError) {
+    fetchError = '분석하려면 기사 본문을 50자 이상 입력해 주세요.';
+    contentStatus = 'fetch_failed_needs_text';
   }
 
   // Construct source item

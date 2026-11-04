@@ -96,31 +96,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-white">Google ADK 분석 워크플로 실행 중</h2>
+          <h2 className="text-xl font-bold text-white">기사 분석 요청 처리 중</h2>
           <p className="text-sm text-slate-400 max-w-md mx-auto">
-            본문 무결성 검증, 수치 보존 사실 추출, {activeTarget?.companyName || '목표 기업'} 및{' '}
-            {activeTarget?.jobRole || '직무'} 맞춤 시사점과 예상 질문을 오케스트레이션하고 있습니다.
+            기사 본문을 확인한 뒤 {activeTarget?.companyName || '목표 기업'} 및{' '}
+            {activeTarget?.jobRole || '직무'}에 맞춰 분석하고 있습니다. Gemini 응답까지 잠시 걸릴 수 있습니다.
           </p>
         </div>
 
-        {/* Workflow steps visualizer */}
-        <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-3">
-          <div className="flex items-center space-x-2 text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>1단계: 안전한 본문 확보 및 보안 유효성 검사 (SSRF 방지)</span>
-          </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>2단계: 기사 핵심 사실 요약 및 다중 태그 자동 분류</span>
-          </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>3단계: 지원 기업·직무 맞춤 실무 시사점 및 모의 면접 질문 생성</span>
-          </div>
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>4단계: 발급된 sourceId 및 근거 구절 일치성 검증</span>
-          </div>
+        <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
+          현재 단계별 진행 상황은 화면에 실시간 표시되지 않습니다. 요청이 완료되거나 시간 제한에 도달하면 결과를 표시합니다.
         </div>
       </div>
     );
