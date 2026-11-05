@@ -249,15 +249,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
             <Info className="w-4 h-4 text-indigo-400 shrink-0" />
             <span>
               이 분석은 과거 <strong>{analysis.targetSnapshot.companyName} ({analysis.targetSnapshot.jobRole})</strong>{' '}
-              기준으로 생성되었습니다. 현재 선택된 대상(
-              <strong>{activeTarget.companyName}</strong>)으로 다시 분석하시겠습니까?
+              기준으로 생성되었습니다. 탐색 기준을 바꿔도 기존 질문은 자동으로 재작성되지 않습니다. 현재 선택한{' '}
+              <strong>{activeTarget.companyName} · {activeTarget.jobRole}</strong> 기준으로 다시 분석하세요.
             </span>
           </div>
           <button
             onClick={onReAnalyzeWithTarget}
             className="self-start sm:self-center shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition"
           >
-            현재 대상으로 재분석
+            {activeTarget.jobRole} 기준으로 재분석
           </button>
         </div>
       )}
@@ -486,6 +486,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
           <span className="text-xs text-purple-300 font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30">
             모의 연습용 (기출 아님)
           </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <p className="text-slate-400">질문 생성 기준: <strong className="text-purple-200">{analysis.targetSnapshot.companyName} · {analysis.targetSnapshot.jobRole}</strong></p>
+          <button type="button" onClick={onReAnalyzeWithTarget} disabled={!activeTarget} className="text-purple-300 hover:text-purple-100 hover:underline disabled:opacity-50">
+            {activeTarget?.jobRole || '현재 직무'} 기준으로 재분석
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
