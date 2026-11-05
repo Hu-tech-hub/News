@@ -55,6 +55,20 @@ interface SearchNewsViewProps {
   }) => Promise<SearchResponse>;
 }
 
+const ARTICLES_PER_PAGE = 10;
+
+function SearchPagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (page: number) => void }) {
+  if (totalPages <= 1) return null;
+  return <nav aria-label="기사 목록 페이지" className="flex flex-wrap items-center justify-center gap-2 py-2">
+    <button type="button" disabled={page === 1} onClick={() => onChange(page - 1)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:opacity-30">이전</button>
+    {Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => (
+      <button type="button" key={number} aria-label={`${number}페이지`} aria-current={page === number ? 'page' : undefined} onClick={() => onChange(number)}
+        className={`rounded-lg border px-3 py-2 text-xs ${page === number ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}>{number}</button>
+    ))}
+    <button type="button" disabled={page === totalPages} onClick={() => onChange(page + 1)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:opacity-30">다음</button>
+  </nav>;
+}
+
 export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
   activeTarget,
   onOpenTargetManager,
@@ -67,6 +81,8 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
   const [extraKeyword, setExtraKeyword] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResponse, setSearchResponse] = useState<SearchResponse | null>(null);
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil((searchResponse?.articles.length || 0) / ARTICLES_PER_PAGE);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [quotaError, setQuotaError] = useState<ApiQuotaError | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
@@ -136,6 +152,8 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
       });
 
       setSearchResponse(resp);
+      setPage(1);
+      setExpandedRelated(new Set());
       if (overrideTimeframe) setTimeframe(overrideTimeframe);
     } catch (err: unknown) {
       if (err instanceof ApiError && err.quotaError) {
@@ -189,6 +207,7 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
   };
 
   const handleLoadSampleArticles = () => {
+    setPage(1);
     const sample = getSampleSearchArticles(activeTarget);
     setSearchResponse({
       articles: sample,
@@ -711,11 +730,13 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                <span>추천 기사 목록 ({searchResponse.articles.length}건)</span>
+                <span>추천 기사 목록 ({searchResponse.articles.length}건) · {(page - 1) * ARTICLES_PER_PAGE + 1}–{Math.min(page * ARTICLES_PER_PAGE, searchResponse.articles.length)}건 표시 · {page}/{totalPages}페이지</span>
                 <span className="text-slate-500">※ 인터넷 상의 모든 기사를 망라한 것은 아닙니다.</span>
               </div>
 
-              {searchResponse.articles.map((article) => {
+              <SearchPagination page={page} totalPages={totalPages} onChange={setPage} />
+
+              {searchResponse.articles.slice((page - 1) * ARTICLES_PER_PAGE, page * ARTICLES_PER_PAGE).map((article) => {
                 const isBookmarked = bookmarkedUrls.has(article.sourceUrl);
                 const isExpanded = expandedRelated.has(article.id);
                 const hasRelated = article.relatedArticles && article.relatedArticles.length > 0;
@@ -822,6 +843,10 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
                   </div>
                 );
               })}
+              <SearchPagination page={page} totalPages={totalPages} onChange={setPage} />
+              {page === totalPages && (
+                <p className="text-center text-xs text-slate-500">이번 검색으로 수집된 마지막 페이지입니다. 더 찾으려면 탐색 기간이나 추가 키워드를 바꿔 검색하세요.</p>
+              )}
             </div>
           )}
         </div>

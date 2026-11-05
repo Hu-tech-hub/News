@@ -22,3 +22,10 @@ test('RSS accepts empty results and rejects a non-feed response', () => {
   assert.equal(parseNewsFeed('<rss><channel><title>검색</title></channel></rss>', params, now).articles.length, 0);
   assert.throws(() => parseNewsFeed('<html>error</html>', params, now));
 });
+
+test('retains results beyond 30 for client pagination and orders newest first', () => {
+  const items = Array.from({ length: 35 }, (_, i) => `<item><title>삼성전자 제품${i} 발표${i}</title><link>https://news.google.com/rss/articles/id${i}</link><pubDate>${new Date(now.getTime() - (36 - i) * 3600000).toUTCString()}</pubDate></item>`).join('');
+  const result = parseNewsFeed(`<rss><channel>${items}</channel></rss>`, params, now);
+  assert.equal(result.articles.length, 35);
+  assert.equal(result.articles[0].title, '삼성전자 제품34 발표34');
+});

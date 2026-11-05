@@ -45,7 +45,8 @@ export function parseNewsFeed(xml: string, params: NewsSearchParams, now = new D
       selectionReason: direct ? `${params.companyName} 기업명으로 검색된 기사` : '관심 기업·산업 검색 결과 (직무 관련성은 본문 확인 필요)',
     });
   }
-  return { articles: clusterAndDeduplicateArticles(articles).slice(0, 30),
+  articles.sort((a, b) => new Date(b.publishedAt!).getTime() - new Date(a.publishedAt!).getTime());
+  return { articles: clusterAndDeduplicateArticles(articles),
     excludedCountMissingDate, excludedCountOutOfRange, totalFoundRaw: entries.length };
 }
 
