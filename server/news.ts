@@ -63,5 +63,5 @@ export async function searchRealNews(params: NewsSearchParams) {
   if (xml.length > 2_000_000) throw new Error('뉴스 피드 응답이 너무 큽니다.');
   return { ...parseNewsFeed(xml, params, now), searchTimeKST: formatToKST(now, 'datetime'),
     timeframe: params.timeframe, queryUsed: query, isGroundingLive: false,
-    notes: 'Google 뉴스 RSS 검색 결과입니다. 기사 링크에서 원문을 열고 본문을 복사해 분석하세요. 뉴스 검색은 Gemini API 한도를 사용하지 않으며, AI 분석에는 별도의 무료 한도가 적용됩니다.' };
+    notes: 'Google 뉴스 RSS 검색 결과입니다. 분석할 기사를 선택하면 언론사 원문을 자동으로 불러옵니다. 뉴스 검색은 Gemini API 한도를 사용하지 않으며, AI 분석에는 별도의 무료 한도가 적용됩니다.' };
 }

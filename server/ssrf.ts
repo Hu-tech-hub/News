@@ -5,6 +5,7 @@
 
 import dns from 'node:dns/promises';
 import { SERVER_CONFIG } from './config.js';
+import { resolveGoogleNewsUrl } from './google-news.js';
 
 function isPrivateIp(ip: string): boolean {
   // IPv4 checks
@@ -110,7 +111,7 @@ function cleanHtmlToText(html: string): { title: string; text: string } {
 export async function fetchSafeArticle(
   urlStr: string,
   redirectCount = 0
-): Promise<{ success: boolean; title?: string; text?: string; error?: string }> {
+): Promise<{ success: boolean; title?: string; text?: string; error?: string; sourceUrl?: string }> {
   if (redirectCount > SERVER_CONFIG.MAX_REDIRECTS) {
     return { success: false, error: '최대 리다이렉트 횟수(3회)를 초과했습니다.' };
   }
@@ -121,7 +122,12 @@ export async function fetchSafeArticle(
   }
 
   if (new URL(urlStr).hostname === 'news.google.com') {
-    return { success: false, error: 'Google 뉴스 링크는 원문 본문이 아닙니다. 기사 링크에서 언론사 원문을 열어 원문 URL 또는 본문을 직접 입력해 주세요.' };
+    try {
+      const publisherUrl = await resolveGoogleNewsUrl(urlStr);
+      return fetchSafeArticle(publisherUrl, redirectCount + 1);
+    } catch (error) {
+      return { success: false, error: `원문 자동 연결 실패: ${error instanceof Error ? error.message : String(error)}` };
+    }
   }
 
   const controller = new AbortController();
@@ -183,6 +189,7 @@ export async function fetchSafeArticle(
 
     return {
       success: true,
+      sourceUrl: urlStr,
       title,
       text: text.slice(0, SERVER_CONFIG.MAX_ARTICLE_CHARS),
     };

@@ -184,6 +184,7 @@ export default function App() {
       setCurrentArticleText(res.articleText);
       setCurrentArticleTitle(res.articleTitle);
       setCurrentSources(res.sources);
+      setCurrentSourceUrl(res.sources[0]?.url || params.sourceUrl || null);
       if (res.analysis) {
         setCurrentAnalysis(res.analysis);
       }

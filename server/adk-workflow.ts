@@ -42,6 +42,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
 
   // Shared context storage for workflow execution
   let currentTitle = input.articleTitle || '무제 기사';
+  let currentSourceUrl = input.sourceUrl || null;
   let currentText = input.articleText || '';
   let contentStatus: ContentStatus = input.articleText ? 'user_provided_text' : 'partial_text';
   let fetchError: string | undefined = undefined;
@@ -63,6 +64,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     if (input.sourceUrl) {
       const fetchResult = await fetchSafeArticle(input.sourceUrl);
       if (fetchResult.success && fetchResult.text) {
+        currentSourceUrl = fetchResult.sourceUrl || currentSourceUrl;
         currentText = fetchResult.text;
         if (fetchResult.title && (!input.articleTitle || input.articleTitle.startsWith('기사 #'))) {
           currentTitle = fetchResult.title;
@@ -93,7 +95,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     const result = await runStructuredAnalysis({
       articleTitle: currentTitle,
       articleText: currentText,
-      sourceUrl: input.sourceUrl || null,
+      sourceUrl: currentSourceUrl,
       targetCompany: input.targetCompany,
       targetRole: input.targetRole,
       industryTags: input.industryTags,
@@ -238,7 +240,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
         analysisResult = await runStructuredAnalysis({
           articleTitle: currentTitle,
           articleText: currentText,
-          sourceUrl: input.sourceUrl || null,
+          sourceUrl: currentSourceUrl,
           targetCompany: input.targetCompany,
           targetRole: input.targetRole,
           industryTags: input.industryTags,
@@ -270,7 +272,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     analysisResult = await runStructuredAnalysis({
       articleTitle: currentTitle,
       articleText: currentText,
-      sourceUrl: input.sourceUrl || null,
+      sourceUrl: currentSourceUrl,
       targetCompany: input.targetCompany,
       targetRole: input.targetRole,
       industryTags: input.industryTags,
@@ -289,7 +291,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     {
       sourceId,
       title: currentTitle,
-      url: input.sourceUrl || null,
+      url: currentSourceUrl,
       publisher: input.sourceUrl ? null : '사용자 제공 직접 입력',
       publishedAt: new Date().toISOString().slice(0, 10),
       retrievedAt: new Date().toISOString(),
