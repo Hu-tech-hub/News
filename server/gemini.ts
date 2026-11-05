@@ -4,10 +4,10 @@
  */
 
 import { GoogleGenAI, Type } from '@google/genai';
-import { SERVER_CONFIG } from './config';
-import { checkArticleRecency, formatToKST, getTimeframeBounds } from '../src/utils/date';
-import { clusterAndDeduplicateArticles } from '../src/utils/dedup';
-import { extractDomainPublisher, normalizeArticleUrl } from '../src/utils/url';
+import { SERVER_CONFIG } from './config.js';
+import { checkArticleRecency, formatToKST, getTimeframeBounds } from '../src/utils/date.js';
+import { clusterAndDeduplicateArticles } from '../src/utils/dedup.js';
+import { extractDomainPublisher, normalizeArticleUrl } from '../src/utils/url.js';
 import {
   AnalysisResult,
   ApiQuotaError,

@@ -1,5 +1,5 @@
 import express from 'express';
-import { apiRouter } from '../server/routes';
+import { apiRouter } from '../server/routes.js';
 
 const app = express();
 

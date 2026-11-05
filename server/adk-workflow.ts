@@ -4,8 +4,8 @@
  */
 
 import { FunctionNode, Workflow, START, InMemoryRunner } from '@google/adk';
-import { fetchSafeArticle } from './ssrf';
-import { runStructuredAnalysis } from './gemini';
+import { fetchSafeArticle } from './ssrf.js';
+import { runStructuredAnalysis } from './gemini.js';
 import { AnalysisResult, ContentStatus, SourceItem } from '../src/types';
 
 export interface WorkflowInput {

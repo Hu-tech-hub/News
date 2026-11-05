@@ -4,10 +4,10 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { isGeminiConfigured, searchRealNews, getApiCallMetrics } from './gemini';
-import { fetchSafeArticle } from './ssrf';
-import { runJobNewsADKWorkflow } from './adk-workflow';
-import { SERVER_CONFIG } from './config';
+import { isGeminiConfigured, searchRealNews, getApiCallMetrics } from './gemini.js';
+import { fetchSafeArticle } from './ssrf.js';
+import { runJobNewsADKWorkflow } from './adk-workflow.js';
+import { SERVER_CONFIG } from './config.js';
 
 export const apiRouter = Router();
 

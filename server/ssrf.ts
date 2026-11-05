@@ -4,7 +4,7 @@
  */
 
 import dns from 'node:dns/promises';
-import { SERVER_CONFIG } from './config';
+import { SERVER_CONFIG } from './config.js';
 
 function isPrivateIp(ip: string): boolean {
   // IPv4 checks

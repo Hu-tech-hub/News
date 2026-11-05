@@ -4,7 +4,7 @@
  */
 
 import { SearchArticleItem } from '../types';
-import { normalizeArticleUrl } from './url';
+import { normalizeArticleUrl } from './url.js';
 
 /**
  * Extracts normalized core tokens from Korean titles for topic clustering
