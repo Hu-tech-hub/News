@@ -25,8 +25,11 @@ import {
 } from 'lucide-react';
 import { Bookmark } from '../types';
 import { formatToKST } from '../utils/date';
+import type { useSheetsSync } from '../services/useSheetsSync';
 
 interface BookmarksViewProps {
+  sheetSync?: ReturnType<typeof useSheetsSync>;
+  sheetSyncConfigured?: boolean;
   bookmarks: Bookmark[];
   onDeleteBookmark: (id: string) => Promise<void>;
   onUpdateBookmarkNotes: (id: string, notes: string) => Promise<void>;
@@ -35,6 +38,8 @@ interface BookmarksViewProps {
 }
 
 export const BookmarksView: React.FC<BookmarksViewProps> = ({
+  sheetSync,
+  sheetSyncConfigured,
   bookmarks,
   onDeleteBookmark,
   onUpdateBookmarkNotes,
@@ -130,6 +135,21 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6 animate-fadeIn">
+      {sheetSync && <section className="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3" aria-label="Google 스프레드시트 동기화">
+        <h2 className="font-semibold text-sm text-white">Google 스프레드시트 동기화</h2>
+        <p className="text-xs text-slate-400">북마크, 분석 결과와 메모를 전용 시트에 저장합니다. 다른 기기에서도 같은 Google 계정을 연결하면 불러올 수 있습니다.</p>
+        {sheetSyncConfigured ? <div className="flex flex-wrap items-center gap-3 text-xs">
+          <button type="button" disabled={!sheetSync.ready || sheetSync.busy} onClick={() => void sheetSync.connect()} className="rounded-lg bg-blue-600 px-3 py-2 text-white disabled:opacity-40">
+            {sheetSync.sheetId ? 'Google 다시 연결' : 'Google 계정 연결'}
+          </button>
+          {sheetSync.sheetId && <>
+            <a className="text-blue-300 underline" href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetSync.sheetId)}/edit`} target="_blank" rel="noopener noreferrer">동기화 시트 열기</a>
+            <button type="button" disabled={sheetSync.busy} onClick={() => void sheetSync.sync()} className="rounded-lg border border-slate-700 px-3 py-2 disabled:opacity-40">지금 동기화</button>
+            <button type="button" disabled={sheetSync.busy} onClick={sheetSync.disconnect} className="text-slate-400">연결 해제</button>
+          </>}
+        </div> : <p className="text-xs text-amber-300">Google 연결을 사용하려면 이 사이트의 OAuth 클라이언트 ID 설정이 필요합니다.</p>}
+        {sheetSync.message && <p role="status" className="text-xs text-slate-300">{sheetSync.message}</p>}
+      </section>}
       {/* Top Header & Backup Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>

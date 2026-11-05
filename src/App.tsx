@@ -36,6 +36,7 @@ import {
 import { analyzeArticle, getSystemStatus, searchNews, SystemStatusResponse } from './services/api';
 import { SEED_BOOKMARKS, SEED_TARGETS } from './utils/seed';
 import { useViewNavigation } from './utils/useViewNavigation';
+import { useSheetsSync } from './services/useSheetsSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useViewNavigation();
@@ -47,6 +48,7 @@ export default function App() {
   const [activeTarget, setActiveTarget] = useState<TargetProfile | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
+  const sheetSync = useSheetsSync(systemStatus?.googleSheetsClientId, setBookmarks);
 
   // Current active analysis state
   const [currentArticleTitle, setCurrentArticleTitle] = useState('');
@@ -330,13 +332,15 @@ export default function App() {
     await saveBookmark(newBookmark);
     const updated = await getAllBookmarks();
     setBookmarks(updated);
+    void sheetSync.sync();
   };
 
   // Delete Bookmark
   const handleDeleteBookmark = async (id: string) => {
-    await deleteBookmark(id);
+    await deleteBookmark(id, sheetSync.linkedSheetId());
     const updated = await getAllBookmarks();
     setBookmarks(updated);
+    void sheetSync.sync();
   };
 
   // Update user notes on bookmark
@@ -351,6 +355,7 @@ export default function App() {
     await saveBookmark(updated);
     const list = await getAllBookmarks();
     setBookmarks(list);
+    void sheetSync.sync();
   };
 
   // Load Seed Demo Data
@@ -473,6 +478,8 @@ export default function App() {
 
         {activeTab === 'bookmarks' && (
           <BookmarksView
+            sheetSync={sheetSync}
+            sheetSyncConfigured={Boolean(systemStatus?.googleSheetsClientId)}
             bookmarks={bookmarks}
             onDeleteBookmark={handleDeleteBookmark}
             onUpdateBookmarkNotes={handleUpdateBookmarkNotes}

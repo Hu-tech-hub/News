@@ -18,6 +18,7 @@ export class ApiError extends Error {
 }
 
 export interface SystemStatusResponse {
+  googleSheetsClientId?: string;
   geminiConfigured: boolean;
   model: string;
   searchModel?: string;

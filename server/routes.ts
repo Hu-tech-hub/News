@@ -16,6 +16,7 @@ export const apiRouter = Router();
 apiRouter.get('/system-status', (_req: Request, res: Response) => {
   const geminiReady = isGeminiConfigured();
   res.json({
+    googleSheetsClientId: process.env.GOOGLE_SHEETS_CLIENT_ID?.trim() || undefined,
     geminiConfigured: geminiReady,
     model: SERVER_CONFIG.GEMINI_MODEL,
     searchModel: 'Google 뉴스 RSS',

@@ -175,14 +175,34 @@ export async function saveBookmark(bookmark: Bookmark): Promise<void> {
   });
 }
 
-export async function deleteBookmark(id: string): Promise<void> {
+const sheetDeletionKey = (sheetId: string) => `sheet-deletions:${sheetId}`;
+
+export async function getSheetDeletions(sheetId: string): Promise<Record<string, number>> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('bookmarks', 'readwrite');
-    const store = tx.objectStore('bookmarks');
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
+    const request = db.transaction('settings').objectStore('settings').get(sheetDeletionKey(sheetId));
+    request.onsuccess = () => resolve(JSON.parse(request.result?.value || '{}'));
     request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteBookmark(id: string, sheetId?: string | null): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['bookmarks', 'settings'], 'readwrite');
+    const store = tx.objectStore('bookmarks');
+    store.delete(id);
+    if (sheetId) {
+      const settings = tx.objectStore('settings');
+      const key = sheetDeletionKey(sheetId);
+      const request = settings.get(key);
+      request.onsuccess = () => {
+        const deletions = JSON.parse(request.result?.value || '{}');
+        settings.put({ key, value: JSON.stringify({ ...deletions, [id]: Date.now() }) });
+      };
+    }
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error || new Error('북마크를 삭제하지 못했습니다.'));
   });
 }
 
@@ -200,4 +220,31 @@ export async function findBookmarkByUrlAndTarget(
       b.targetSnapshot.jobRole.trim().toLowerCase() === jobRole.trim().toLowerCase()
   );
   return match || null;
+}
+
+export async function mergeSheetBookmarks(
+  versions: { id: string; updatedAt: number; bookmark: Bookmark | null }[],
+  sheetId: string,
+): Promise<void> {
+  if (!versions.length) return;
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(['bookmarks', 'settings'], 'readwrite');
+    const store = tx.objectStore('bookmarks');
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error || new Error('시트 변경사항을 저장하지 못했습니다.'));
+    const deleted = tx.objectStore('settings').get(sheetDeletionKey(sheetId));
+    deleted.onsuccess = () => {
+      const tombstones = JSON.parse(deleted.result?.value || '{}') as Record<string, number>;
+      for (const version of versions) {
+        const request = store.get(version.id);
+        request.onsuccess = () => {
+          const local = request.result as Bookmark | undefined;
+          if (version.updatedAt < (local?.updatedAt ?? -1) || version.updatedAt < (tombstones[version.id] ?? -1)) return;
+          if (version.bookmark) store.put(version.bookmark);
+          else store.delete(version.id);
+        };
+      }
+    };
+  });
 }
