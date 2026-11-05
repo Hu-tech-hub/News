@@ -120,6 +120,10 @@ export async function fetchSafeArticle(
     return { success: false, error: check.error };
   }
 
+  if (new URL(urlStr).hostname === 'news.google.com') {
+    return { success: false, error: 'Google 뉴스 링크는 원문 본문이 아닙니다. 기사 링크에서 언론사 원문을 열어 원문 URL 또는 본문을 직접 입력해 주세요.' };
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SERVER_CONFIG.FETCH_URL_TIMEOUT_MS);
 

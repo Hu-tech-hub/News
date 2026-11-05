@@ -4,7 +4,8 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { isGeminiConfigured, searchRealNews, getApiCallMetrics } from './gemini.js';
+import { isGeminiConfigured, getApiCallMetrics } from './gemini.js';
+import { searchRealNews } from './news.js';
 import { fetchSafeArticle } from './ssrf.js';
 import { runJobNewsADKWorkflow } from './adk-workflow.js';
 import { SERVER_CONFIG } from './config.js';
@@ -17,15 +18,15 @@ apiRouter.get('/system-status', (_req: Request, res: Response) => {
   res.json({
     geminiConfigured: geminiReady,
     model: SERVER_CONFIG.GEMINI_MODEL,
-    searchModel: SERVER_CONFIG.GEMINI_SEARCH_MODEL,
+    searchModel: 'Google 뉴스 RSS',
     adkPackage: SERVER_CONFIG.ADK_PACKAGE,
     adkVersion: SERVER_CONFIG.ADK_VERSION,
     promptVersion: SERVER_CONFIG.PROMPT_VERSION,
-    searchGroundingSupported: geminiReady,
+    searchGroundingSupported: false,
     apiMetrics: getApiCallMetrics(),
     statusMessage: geminiReady
       ? `${SERVER_CONFIG.GEMINI_MODEL} 및 Google ADK 워크플로가 정상 가동 중입니다.`
-      : 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다. 실시간 검색 및 분석을 위해 API 키가 필요합니다.',
+      : '뉴스 RSS 검색은 사용 가능합니다. 기사 분석에는 GEMINI_API_KEY 환경변수가 필요합니다.',
   });
 });
 
@@ -47,14 +48,6 @@ apiRouter.post('/search-news', async (req: Request, res: Response) => {
       extraKeyword,
       timeframe,
     });
-
-    if (searchResult.quotaError) {
-      return res.status(429).json({
-        error: searchResult.notes || searchResult.quotaError.friendlyMessage,
-        quotaError: searchResult.quotaError,
-        searchResult,
-      });
-    }
 
     return res.json(searchResult);
   } catch (err: unknown) {

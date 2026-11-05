@@ -6,8 +6,6 @@
 export const SERVER_CONFIG = {
   // Lowest-cost stable Gemini model for text analysis.
   GEMINI_MODEL: 'gemini-3.1-flash-lite',
-  // Gemini 3.1 Search Grounding requires billing; 2.5 supports free-tier search.
-  GEMINI_SEARCH_MODEL: 'gemini-2.5-flash-lite',
   PROMPT_VERSION: 'v1.2.0-career-notes',
   
   // Timeouts (milliseconds)
