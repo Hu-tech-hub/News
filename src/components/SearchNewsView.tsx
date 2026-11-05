@@ -46,6 +46,8 @@ interface SearchNewsViewProps {
     inputType: 'search' | 'url' | 'text';
   }) => void;
   bookmarkedUrls: Set<string>;
+  analyzedUrls?: Set<string>;
+  onResults?: (articles: SearchArticleItem[]) => void;
   onPerformSearch: (params: {
     companyName: string;
     jobRole: string;
@@ -74,6 +76,8 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
   onOpenTargetManager,
   onAnalyzeArticle,
   bookmarkedUrls,
+  analyzedUrls,
+  onResults,
   onPerformSearch,
 }) => {
   const [activeInputMode, setActiveInputMode] = useState<'search' | 'url' | 'text'>('search');
@@ -152,6 +156,7 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
       });
 
       setSearchResponse(resp);
+      onResults?.(resp.articles);
       setPage(1);
       setExpandedRelated(new Set());
       if (overrideTimeframe) setTimeframe(overrideTimeframe);
@@ -209,6 +214,7 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
   const handleLoadSampleArticles = () => {
     setPage(1);
     const sample = getSampleSearchArticles(activeTarget);
+    onResults?.(sample);
     setSearchResponse({
       articles: sample,
       searchTimeKST: formatToKST(new Date(), 'datetime'),
@@ -771,6 +777,7 @@ export const SearchNewsView: React.FC<SearchNewsViewProps> = ({
                               <span>저장됨</span>
                             </span>
                           )}
+                          {analyzedUrls?.has(article.sourceUrl) && <span className="text-[11px] text-blue-300">분석 완료</span>}
                         </div>
 
                         <h3 className="text-base font-bold text-white hover:text-blue-400 transition">

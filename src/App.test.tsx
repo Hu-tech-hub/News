@@ -10,6 +10,7 @@ test('streamed stages, target changes, stale responses, and empty-body failures 
     Object.defineProperty(globalThis, key, { configurable: true, value: (dom.window as any)[key] });
   }
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  dom.window.scrollTo = () => {};
   Object.defineProperty(dom.window, 'indexedDB', { value: new IDBFactory() });
   const { saveTarget, setActiveTargetId } = await import('./services/db.js');
   const a = { id: 'a', companyName: '현대자동차', jobRole: '품질관리', industryTags: [], createdAt: 1, updatedAt: 1 };
@@ -82,7 +83,7 @@ test('streamed stages, target changes, stale responses, and empty-body failures 
     await act(async () => { (document.querySelector('button[title="관심 대상 관리"]') as HTMLElement).click(); }); await settle();
     await act(async () => { (document.querySelector('button[title="수정"]') as HTMLElement).click(); }); await settle();
     await input('input[placeholder="예: 반도체 공정설계, 배터리 개발, 백엔드"]', '전장 설계');
-    await act(async () => { document.querySelector('form')!.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })); }); await settle();
+    await act(async () => { document.querySelector('.fixed form')!.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })); }); await settle();
     assert.equal(pending[3].body.targetRole, '전장 설계');
     await emit(3, { type: 'result', result: { ...result(3, '본문 없는 잘못된 사실'), articleText: '' } }, true);
     assert.match(document.body.textContent || '', /기사 본문 또는 분석 기준이 요청과 일치하지 않아/);

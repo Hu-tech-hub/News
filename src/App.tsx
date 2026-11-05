@@ -17,6 +17,7 @@ import {
   Bookmark,
   ContentStatus,
   SearchResponse,
+  SearchArticleItem,
   SourceItem,
   TargetProfile,
   TimeframeOption,
@@ -34,9 +35,14 @@ import {
 } from './services/db';
 import { analyzeArticle, getSystemStatus, searchNews, SystemStatusResponse } from './services/api';
 import { SEED_BOOKMARKS, SEED_TARGETS } from './utils/seed';
+import { useViewNavigation } from './utils/useViewNavigation';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'search' | 'analysis' | 'bookmarks'>('search');
+  const [activeTab, setActiveTab] = useViewNavigation();
+  const [searchArticles, setSearchArticles] = useState<SearchArticleItem[]>([]);
+  const [selectedSearchUrl, setSelectedSearchUrl] = useState<string | null>(null);
+  const [analyzedUrls, setAnalyzedUrls] = useState<Set<string>>(new Set());
+  const [resolvedArticleUrls, setResolvedArticleUrls] = useState<Record<string, string>>({});
   const [targets, setTargets] = useState<TargetProfile[]>([]);
   const [activeTarget, setActiveTarget] = useState<TargetProfile | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -98,8 +104,11 @@ export default function App() {
     bookmarks.forEach((b) => {
       if (b.sourceUrl) set.add(b.sourceUrl);
     });
+    Object.entries(resolvedArticleUrls).forEach(([original, resolved]) => {
+      if (set.has(resolved)) set.add(original);
+    });
     return set;
-  }, [bookmarks]);
+  }, [bookmarks, resolvedArticleUrls]);
 
   // Is current article bookmarked?
   const isCurrentBookmarked = useMemo(() => {
@@ -174,10 +183,12 @@ export default function App() {
     setAnalysisDurationMs(null);
     setAnalysisProgress([{ stage: 'receiving', elapsedMs: 0 }]);
     setCurrentAnalysis(null);
+    const searchedArticle = params.sourceUrl ? searchArticles.find((article) => article.sourceUrl === params.sourceUrl || resolvedArticleUrls[article.sourceUrl] === params.sourceUrl) : undefined;
+    setSelectedSearchUrl(searchedArticle?.sourceUrl || null);
     setCurrentSources([]);
     setCurrentPublisher(null);
     setCurrentPublishedAt(null);
-    setActiveTab('analysis');
+    setActiveTab('analysis', true);
     setIsAnalyzing(true);
     setAnalysisError(undefined);
     setCurrentArticleTitle(params.articleTitle);
@@ -206,6 +217,7 @@ export default function App() {
       }
 
       setCurrentSourceUrl(res.sources[0]?.url || params.sourceUrl || null);
+      if (params.sourceUrl && res.sources[0]?.url) setResolvedArticleUrls((previous) => ({ ...previous, [params.sourceUrl!]: res.sources[0].url! }));
       setCurrentSources(res.sources);
       if (!res.success) {
         setCurrentArticleText(res.articleText || params.articleText || '');
@@ -219,6 +231,7 @@ export default function App() {
       setCurrentArticleTitle(res.articleTitle);
       if (res.analysis) {
         setCurrentAnalysis(res.analysis);
+        if (params.sourceUrl) setAnalyzedUrls((previous) => new Set([...previous, params.sourceUrl!]));
       }
     } catch (err) {
       if (analysisRequest.current !== controller) return;
@@ -399,17 +412,34 @@ export default function App() {
 
       {/* Main Views */}
       <main className="flex-1 pb-16">
-        {activeTab === 'search' && (
+        <div hidden={activeTab !== 'search'}>
           <SearchNewsView
             activeTarget={activeTarget}
             onOpenTargetManager={() => setIsTargetManagerOpen(true)}
             onAnalyzeArticle={handleAnalyzeArticle}
             bookmarkedUrls={bookmarkedUrls}
             onPerformSearch={handlePerformSearch}
+            onResults={setSearchArticles}
+            analyzedUrls={analyzedUrls}
           />
-        )}
+        </div>
 
         {activeTab === 'analysis' && (
+          <>
+          <div className="max-w-5xl mx-auto px-4 pt-5 flex flex-wrap items-center justify-between gap-3">
+            <button type="button" onClick={() => setActiveTab('search')} className="text-sm font-semibold text-blue-300 hover:underline">← 검색 결과로</button>
+            {selectedSearchUrl && searchArticles.some((article) => article.sourceUrl === selectedSearchUrl) && (
+              <div className="flex gap-3 text-xs text-slate-300">
+                {([-1, 1] as const).map((offset) => {
+                  const index = searchArticles.findIndex((article) => article.sourceUrl === selectedSearchUrl);
+                  const article = searchArticles[index + offset];
+                  return <button type="button" key={offset} disabled={!article || isAnalyzing} className="rounded-lg border border-slate-700 px-3 py-2 disabled:opacity-30" onClick={() => {
+                    if (article) void handleAnalyzeArticle({ articleTitle: article.title, sourceUrl: article.sourceUrl, inputType: 'search' });
+                  }}>{offset < 0 ? '이전 기사' : '다음 기사'}</button>;
+                })}
+              </div>
+            )}
+          </div>
           <AnalysisView
             articleTitle={currentArticleTitle}
             sourceUrl={currentSourceUrl}
@@ -438,6 +468,7 @@ export default function App() {
             }}
             onLoadSampleAnalysis={handleLoadSampleAnalysis}
           />
+          </>
         )}
 
         {activeTab === 'bookmarks' && (
