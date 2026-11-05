@@ -78,6 +78,11 @@ apiRouter.post('/fetch-url', async (req: Request, res: Response) => {
 
 // Run ADK Career News Analysis endpoint
 apiRouter.post('/analyze-article', async (req: Request, res: Response) => {
+  const streaming = req.headers.accept?.includes('application/x-ndjson');
+  const startedAt = Date.now();
+  const send = (event: unknown) => {
+    if (!res.destroyed && !res.writableEnded) res.write(`${JSON.stringify(event)}\n`);
+  };
   try {
     const {
       articleTitle,
@@ -101,6 +106,13 @@ apiRouter.post('/analyze-article', async (req: Request, res: Response) => {
       });
     }
 
+    if (streaming) {
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      send({ type: 'progress', stage: 'receiving', elapsedMs: 0 });
+    }
     const workflowResult = await runJobNewsADKWorkflow({
       articleTitle: articleTitle || '선택한 뉴스 기사',
       articleText,
@@ -109,11 +121,19 @@ apiRouter.post('/analyze-article', async (req: Request, res: Response) => {
       targetRole,
       industryTags,
       inputType,
-    });
+    }, streaming ? (stage) => send({ type: 'progress', stage, elapsedMs: Date.now() - startedAt }) : undefined);
 
+    if (streaming) {
+      send({ type: 'result', result: workflowResult });
+      return res.end();
+    }
     return res.json(workflowResult);
   } catch (err: unknown) {
     console.error('Analyze article route error:', err);
+    if (res.headersSent) {
+      send({ type: 'error', message: `기사 분석 중 오류가 발생했습니다: ${err instanceof Error ? err.message : String(err)}` });
+      return res.end();
+    }
     return res.status(500).json({
       success: false,
       errorMessage: `기사 분석 중 오류가 발생했습니다: ${err instanceof Error ? err.message : String(err)}`,

@@ -4,6 +4,12 @@
  */
 
 // Target company and job role combinations
+export type AnalysisStage = 'receiving' | 'fetching' | 'analyzing' | 'validating';
+export interface AnalysisProgress {
+  stage: AnalysisStage;
+  elapsedMs: number;
+}
+
 export interface TargetProfile {
   id: string;
   companyName: string;

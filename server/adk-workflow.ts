@@ -6,7 +6,7 @@
 import { FunctionNode, Workflow, START, InMemoryRunner } from '@google/adk';
 import { fetchSafeArticle } from './ssrf.js';
 import { runStructuredAnalysis } from './gemini.js';
-import { AnalysisResult, ContentStatus, SourceItem } from '../src/types';
+import { AnalysisResult, ContentStatus, SourceItem, AnalysisStage } from '../src/types';
 
 export interface WorkflowInput {
   articleTitle: string;
@@ -36,7 +36,7 @@ export interface WorkflowOutput {
 /**
  * Builds and runs the Google ADK Workflow for evidence-based career news analysis
  */
-export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<WorkflowOutput> {
+export async function runJobNewsADKWorkflow(input: WorkflowInput, onProgress?: (stage: AnalysisStage) => void): Promise<WorkflowOutput> {
   const executedNodes: string[] = [];
   const sourceId = `src-1`;
 
@@ -52,6 +52,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
   // Node 1: Input Validation and Safe Content Retrieval
   const inputValidationNode = new FunctionNode('input_validation_and_fetch', async (ctx, nodeInput: any) => {
     executedNodes.push('input_validation_and_fetch');
+    onProgress?.('fetching');
 
     // Case A: User provided direct text
     if (input.articleText && input.articleText.trim().length >= 50) {
@@ -92,6 +93,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     }
 
     analysisNodeStarted = true;
+    onProgress?.('analyzing');
     const result = await runStructuredAnalysis({
       articleTitle: currentTitle,
       articleText: currentText,
@@ -113,6 +115,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     if (!analysisResult) {
       return { status: 'incomplete' };
     }
+    onProgress?.('validating');
 
     // Verify all sourceIds in summary, implications, and questions match valid sources
     const validSourceIds = new Set([sourceId]);

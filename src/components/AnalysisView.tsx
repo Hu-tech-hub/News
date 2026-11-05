@@ -23,7 +23,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
-import { AnalysisResult, ContentStatus, SourceItem, TargetProfile } from '../types';
+import { AnalysisResult, AnalysisProgress, ContentStatus, SourceItem, TargetProfile } from '../types';
 import { formatToKST } from '../utils/date';
 
 interface AnalysisViewProps {
@@ -37,6 +37,8 @@ interface AnalysisViewProps {
   sources: SourceItem[];
   activeTarget: TargetProfile | null;
   isAnalyzing: boolean;
+  progress?: AnalysisProgress[];
+  startedAt?: number;
   onSaveBookmark: () => Promise<void>;
   isBookmarked: boolean;
   onReAnalyzeWithTarget: () => void;
@@ -56,6 +58,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
   sources,
   activeTarget,
   isAnalyzing,
+  progress = [],
+  startedAt = 0,
   onSaveBookmark,
   isBookmarked,
   onReAnalyzeWithTarget,
@@ -77,17 +81,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
   // Dynamic step progression and timer while analyzing
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   React.useEffect(() => {
-    if (!isAnalyzing) {
-      setElapsedSeconds(0);
-      return;
-    }
-
+    if (!isAnalyzing) return;
+    const updateElapsed = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    updateElapsed();
     const timer = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
+      updateElapsed();
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isAnalyzing]);
+  }, [isAnalyzing, startedAt]);
 
   // Check if current target differs from analysis snapshot
   const isTargetMismatched =
@@ -128,9 +130,22 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
           </p>
         </div>
 
-        <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
-          현재 단계별 진행 상황은 화면에 실시간 표시되지 않습니다. 요청이 완료되거나 시간 제한에 도달하면 결과를 표시합니다.
-        </div>
+        <ol className="max-w-md mx-auto rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left space-y-3" aria-label="실시간 분석 진행 단계">
+          {([
+            ['receiving', '요청 접수'], ['fetching', '원문 주소 확인 · 본문 수집'],
+            ['analyzing', 'AI 요약 · 직무 시사점 · 면접 질문 생성'], ['validating', '출처 검증 · 결과 정리'],
+          ] as const).map(([stage, label]) => {
+            const position = progress.findIndex((item) => item.stage === stage);
+            const done = position >= 0 && position < progress.length - 1;
+            const running = position >= 0 && position === progress.length - 1;
+            const seconds = position < 0 ? 0 : Math.max(0, Math.floor(((progress[position + 1]?.elapsedMs ?? elapsedSeconds * 1000) - progress[position].elapsedMs) / 1000));
+            return <li key={stage} className={`flex items-center justify-between gap-3 text-xs ${running ? 'text-blue-300' : done ? 'text-emerald-300' : 'text-slate-500'}`} aria-current={running ? 'step' : undefined}>
+              <span>{done ? '✓' : running ? '●' : '○'} {label}</span>
+              <span className="shrink-0 tabular-nums">{done ? `완료 · ${seconds}초` : running ? `진행 중 · ${seconds}초` : '대기'}</span>
+            </li>;
+          })}
+        </ol>
+        <p className="text-xs text-slate-500">서버에서 확인된 실제 단계입니다. Gemini 내부 생성의 남은 시간은 제공되지 않습니다.</p>
 
         {elapsedSeconds >= 20 && (
           <p className="text-xs text-slate-400 max-w-md mx-auto" role="status">
@@ -139,6 +154,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
         )}
       </div>
     );
+  }
+
+  if (analysis && articleText.trim().length < 50) {
+    return <div className="max-w-3xl mx-auto p-8 space-y-4 text-sm text-amber-200">
+      <p>이 결과에는 분석 근거인 기사 본문이 없어 신뢰할 수 있는 분석으로 표시하지 않습니다. 현재 탐색 기준으로 원문을 다시 확인해 주세요.</p>
+      <button type="button" onClick={onReAnalyzeWithTarget} className="rounded-xl bg-blue-600 px-4 py-2 text-white">원문 확인 후 다시 분석</button>
+    </div>;
   }
 
   // Error / Needs manual text input state

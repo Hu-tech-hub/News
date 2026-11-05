@@ -110,10 +110,6 @@ export const TargetManagerModal: React.FC<TargetManagerModalProps> = ({
     };
 
     await onSaveTarget(targetPayload);
-    // If it's the first or active, make it selected
-    if (!activeTarget || activeTarget.id === targetPayload.id || targets.length === 0) {
-      onSelectTarget(targetPayload);
-    }
 
     resetForm();
   };
@@ -364,7 +360,7 @@ export const TargetManagerModal: React.FC<TargetManagerModalProps> = ({
                   className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition"
                 >
                   <Check className="w-4 h-4" />
-                  <span>{isEditing ? '변경사항 저장' : '등록하고 완료'}</span>
+                  <span>{isEditing ? '저장하고 분석 기준에 적용' : '등록하고 분석 기준에 적용'}</span>
                 </button>
               </div>
             </form>

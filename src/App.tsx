@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { SearchNewsView } from './components/SearchNewsView';
 import { AnalysisView } from './components/AnalysisView';
@@ -13,6 +13,7 @@ import { BackupModal } from './components/BackupModal';
 import { SystemStatusBar } from './components/SystemStatusBar';
 import {
   AnalysisResult,
+  AnalysisProgress,
   Bookmark,
   ContentStatus,
   SearchResponse,
@@ -52,6 +53,10 @@ export default function App() {
   const [currentSources, setCurrentSources] = useState<SourceItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | undefined>(undefined);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress[]>([]);
+  const [analysisStartedAt, setAnalysisStartedAt] = useState(0);
+  const [requestTarget, setRequestTarget] = useState<TargetProfile | null>(null);
+  const analysisRequest = useRef<AbortController | null>(null);
 
   // Modals
   const [isTargetManagerOpen, setIsTargetManagerOpen] = useState(false);
@@ -111,10 +116,7 @@ export default function App() {
     await saveTarget(target);
     const updated = await getAllTargets();
     setTargets(updated);
-    if (!activeTarget || activeTarget.id === target.id) {
-      setActiveTarget(target);
-      await setActiveTargetId(target.id);
-    }
+    await handleSelectTarget(target);
   };
 
   const handleDeleteTarget = async (id: string) => {
@@ -129,7 +131,13 @@ export default function App() {
   };
 
   const handleSelectTarget = async (target: TargetProfile) => {
+    const changed = activeTarget?.companyName !== target.companyName || activeTarget?.jobRole !== target.jobRole || JSON.stringify(activeTarget?.industryTags) !== JSON.stringify(target.industryTags);
     setActiveTarget(target);
+    setIsTargetManagerOpen(false);
+    if (changed && currentArticleTitle && (currentArticleText || currentSourceUrl)) {
+      void handleAnalyzeArticle({ articleTitle: currentArticleTitle, articleText: currentArticleText,
+        sourceUrl: currentSourceUrl, inputType: currentSourceUrl ? 'url' : 'text' }, target);
+    }
     await setActiveTargetId(target.id);
   };
 
@@ -150,12 +158,22 @@ export default function App() {
     articleText?: string;
     sourceUrl?: string | null;
     inputType: 'search' | 'url' | 'text';
-  }) => {
-    if (!activeTarget) {
+  }, selectedTarget = activeTarget) => {
+    if (!selectedTarget) {
       setIsTargetManagerOpen(true);
       return;
     }
 
+    analysisRequest.current?.abort();
+    const controller = new AbortController();
+    analysisRequest.current = controller;
+    setRequestTarget(selectedTarget);
+    setAnalysisStartedAt(Date.now());
+    setAnalysisProgress([{ stage: 'receiving', elapsedMs: 0 }]);
+    setCurrentAnalysis(null);
+    setCurrentSources([]);
+    setCurrentPublisher(null);
+    setCurrentPublishedAt(null);
     setActiveTab('analysis');
     setIsAnalyzing(true);
     setAnalysisError(undefined);
@@ -168,15 +186,26 @@ export default function App() {
         articleTitle: params.articleTitle,
         articleText: params.articleText,
         sourceUrl: params.sourceUrl,
-        targetCompany: activeTarget.companyName,
-        targetRole: activeTarget.jobRole,
-        industryTags: activeTarget.industryTags,
+        targetCompany: selectedTarget.companyName,
+        targetRole: selectedTarget.jobRole,
+        industryTags: selectedTarget.industryTags,
         inputType: params.inputType,
-      });
+      }, (progress) => {
+        if (analysisRequest.current !== controller) return;
+        setAnalysisProgress((previous) => previous.some((item) => item.stage === progress.stage) ? previous : [...previous, progress]);
+      }, controller.signal);
+
+      if (analysisRequest.current !== controller) return;
+
+      if (res.success && (!res.analysis || res.articleText.trim().length < 50 ||
+        res.analysis.targetSnapshot.companyName !== selectedTarget.companyName || res.analysis.targetSnapshot.jobRole !== selectedTarget.jobRole)) {
+        throw new Error('기사 본문 또는 분석 기준이 요청과 일치하지 않아 결과를 표시하지 않았습니다. 다시 분석해 주세요.');
+      }
 
       setCurrentSourceUrl(res.sources[0]?.url || params.sourceUrl || null);
       setCurrentSources(res.sources);
       if (!res.success) {
+        setCurrentArticleText(res.articleText || params.articleText || '');
         setCurrentContentStatus(res.contentStatus);
         setAnalysisError(res.errorMessage || '기사 본문을 불러오지 못했습니다.');
         return;
@@ -189,9 +218,10 @@ export default function App() {
         setCurrentAnalysis(res.analysis);
       }
     } catch (err) {
+      if (analysisRequest.current !== controller) return;
       setAnalysisError(err instanceof Error ? err.message : '분석 처리 중 오류가 발생했습니다.');
     } finally {
-      setIsAnalyzing(false);
+      if (analysisRequest.current === controller) setIsAnalyzing(false);
     }
   };
 
@@ -208,12 +238,11 @@ export default function App() {
 
   // Load sample grounded analysis immediately to verify full UI flow
   const handleLoadSampleAnalysis = () => {
+    analysisRequest.current?.abort();
+    analysisRequest.current = null;
     const seed = SEED_BOOKMARKS[0];
-    const targetComp = activeTarget?.companyName || '삼성전자';
-    const targetRole = activeTarget?.jobRole || '반도체 공정설계 (메모리사업부)';
-    const targetTags = activeTarget?.industryTags || ['반도체', '제조/장비'];
 
-    setCurrentArticleTitle(seed.title);
+    setCurrentArticleTitle(`[체험용 샘플] ${seed.title}`);
     setCurrentSourceUrl(seed.sourceUrl);
     setCurrentPublisher(seed.publisher);
     setCurrentPublishedAt(seed.publishedAt);
@@ -222,11 +251,7 @@ export default function App() {
     setCurrentSources(seed.sources);
     setCurrentAnalysis({
       ...seed,
-      targetSnapshot: {
-        companyName: targetComp,
-        jobRole: targetRole,
-        industryTags: targetTags,
-      },
+      targetSnapshot: { ...seed.targetSnapshot },
       orchestrator: 'google-adk-workflow',
     });
     setAnalysisError(undefined);
@@ -386,8 +411,10 @@ export default function App() {
             articleText={currentArticleText}
             analysis={currentAnalysis}
             sources={currentSources}
-            activeTarget={activeTarget}
+            activeTarget={isAnalyzing ? requestTarget : activeTarget}
             isAnalyzing={isAnalyzing}
+            progress={analysisProgress}
+            startedAt={analysisStartedAt}
             onSaveBookmark={handleSaveBookmark}
             isBookmarked={isCurrentBookmarked}
             onReAnalyzeWithTarget={handleReAnalyzeWithTarget}

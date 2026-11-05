@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ApiQuotaError, SearchResponse, TimeframeOption } from '../types';
+import { ApiQuotaError, SearchResponse, TimeframeOption, AnalysisProgress } from '../types';
 import { WorkflowOutput } from '../../server/adk-workflow';
 
 export class ApiError extends Error {
@@ -90,11 +90,12 @@ export async function analyzeArticle(params: {
   targetRole: string;
   industryTags: string[];
   inputType: 'search' | 'url' | 'text';
-}): Promise<WorkflowOutput> {
+}, onProgress?: (progress: AnalysisProgress) => void, signal?: AbortSignal): Promise<WorkflowOutput> {
   const res = await fetch('/api/analyze-article', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
     body: JSON.stringify(params),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(65_000)]) : AbortSignal.timeout(65_000),
   });
 
   if (!res.ok) {
@@ -102,5 +103,26 @@ export async function analyzeArticle(params: {
     throw new Error(errorData.errorMessage || errorData.error || '기사 분석 요청에 실패했습니다.');
   }
 
-  return res.json();
+  if (!res.headers.get('content-type')?.includes('application/x-ndjson')) return res.json();
+  if (!res.body) throw new Error('분석 진행 응답을 읽을 수 없습니다.');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      if (done && buffer.trim()) lines.push(buffer);
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'progress') onProgress?.({ stage: event.stage, elapsedMs: event.elapsedMs });
+        if (event.type === 'result') return event.result;
+        if (event.type === 'error') throw new Error(event.message);
+      }
+      if (done) throw new Error('분석 연결이 결과 수신 전에 종료되었습니다. 다시 시도해 주세요.');
+    }
+  } finally { reader.releaseLock(); }
 }
