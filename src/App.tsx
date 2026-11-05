@@ -174,6 +174,8 @@ export default function App() {
         inputType: params.inputType,
       });
 
+      setCurrentSourceUrl(res.sources[0]?.url || params.sourceUrl || null);
+      setCurrentSources(res.sources);
       if (!res.success) {
         setCurrentContentStatus(res.contentStatus);
         setAnalysisError(res.errorMessage || '기사 본문을 불러오지 못했습니다.');
@@ -183,8 +185,6 @@ export default function App() {
       setCurrentContentStatus(res.contentStatus);
       setCurrentArticleText(res.articleText);
       setCurrentArticleTitle(res.articleTitle);
-      setCurrentSources(res.sources);
-      setCurrentSourceUrl(res.sources[0]?.url || params.sourceUrl || null);
       if (res.analysis) {
         setCurrentAnalysis(res.analysis);
       }

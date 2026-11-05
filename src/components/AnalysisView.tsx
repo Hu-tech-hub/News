@@ -67,6 +67,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
   const [pasteText, setPasteText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const articleUrl = (() => {
+    try {
+      const url = new URL(sourceUrl || '');
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+    } catch { return null; }
+  })();
 
   // Dynamic step progression and timer while analyzing
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -150,6 +156,28 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
               </p>
             </div>
           </div>
+
+          {articleUrl && (
+            <div className="space-y-2 rounded-xl border border-amber-500/20 bg-slate-900/60 p-4">
+              <a
+                href={articleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-300 hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                기사 원문 열기
+              </a>
+              <input
+                aria-label="기사 원문 URL"
+                value={articleUrl}
+                readOnly
+                onFocus={(event) => event.currentTarget.select()}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-xs text-slate-300"
+              />
+              <p className="text-xs text-slate-400">새 탭에서 기사를 열어 본문을 복사한 후 아래 입력란에 붙여넣으세요.</p>
+            </div>
+          )}
 
           {/* Quick Experience Shortcut */}
           {onLoadSampleAnalysis && (

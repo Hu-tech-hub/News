@@ -63,8 +63,8 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
     // Case B: URL is provided and needs fetching
     if (input.sourceUrl) {
       const fetchResult = await fetchSafeArticle(input.sourceUrl);
+      currentSourceUrl = fetchResult.sourceUrl || currentSourceUrl;
       if (fetchResult.success && fetchResult.text) {
-        currentSourceUrl = fetchResult.sourceUrl || currentSourceUrl;
         currentText = fetchResult.text;
         if (fetchResult.title && (!input.articleTitle || input.articleTitle.startsWith('기사 #'))) {
           currentTitle = fetchResult.title;
@@ -312,7 +312,7 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
       publishedAt: new Date().toISOString().slice(0, 10),
       retrievedAt: new Date().toISOString(),
       sourceType: input.sourceUrl ? 'retrieved_article' : 'user_provided',
-      verificationStatus: input.sourceUrl ? 'verified_url' : 'user_unverified',
+      verificationStatus: fetchError ? 'fetch_error' : input.sourceUrl ? 'verified_url' : 'user_unverified',
     },
   ];
 

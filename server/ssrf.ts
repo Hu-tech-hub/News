@@ -124,7 +124,8 @@ export async function fetchSafeArticle(
   if (new URL(urlStr).hostname === 'news.google.com') {
     try {
       const publisherUrl = await resolveGoogleNewsUrl(urlStr);
-      return fetchSafeArticle(publisherUrl, redirectCount + 1);
+      const result = await fetchSafeArticle(publisherUrl, redirectCount + 1);
+      return { ...result, sourceUrl: result.sourceUrl || publisherUrl };
     } catch (error) {
       return { success: false, error: `원문 자동 연결 실패: ${error instanceof Error ? error.message : String(error)}` };
     }
@@ -160,6 +161,7 @@ export async function fetchSafeArticle(
     if (!res.ok) {
       return {
         success: false,
+        sourceUrl: urlStr,
         error: `기사 페이지 접근 오류 (HTTP ${res.status}): 언론사 유료벽이나 봇 차단 정책이 적용된 페이지일 수 있습니다. 본문을 직접 복사하여 입력해주세요.`,
       };
     }
