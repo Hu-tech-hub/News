@@ -180,6 +180,22 @@ export async function runJobNewsADKWorkflow(input: WorkflowInput): Promise<Workf
       errorMessage.includes('UNAVAILABLE') ||
       errorMessage.includes('high demand');
 
+    if ((wfErr as { status?: number })?.status === 504 || errorMessage.includes('DEADLINE_EXCEEDED') || /timeout|timed out/i.test(errorMessage)) {
+      return {
+        success: false,
+        contentStatus,
+        articleText: currentText,
+        articleTitle: currentTitle,
+        sources: [],
+        errorMessage: '기사 본문은 수집했지만 Gemini가 제한 시간 안에 분석을 완료하지 못했습니다. API 한도 초과(429)와는 다른 응답 시간 초과입니다. 잠시 후 다시 분석해 주세요.',
+        adkExecutionDetails: {
+          workflowName: jobNewsWorkflow.name,
+          nodesExecuted: executedNodes,
+          completedAt: new Date().toISOString(),
+        },
+      };
+    }
+
     // CRITICAL: Do NOT attempt retry if error is 429 RESOURCE_EXHAUSTED or 503 UNAVAILABLE
     if (is429) {
       console.warn('[ADK Workflow] 할당량 초과(429) 감지: 추가 재시도를 즉시 차단하고 사용자에게 안내합니다.');

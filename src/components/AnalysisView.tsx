@@ -126,25 +126,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
           현재 단계별 진행 상황은 화면에 실시간 표시되지 않습니다. 요청이 완료되거나 시간 제한에 도달하면 결과를 표시합니다.
         </div>
 
-        {/* Server delay or API quota shortcut notice */}
-        {elapsedSeconds >= 5 && onLoadSampleAnalysis && (
-          <div className="max-w-lg mx-auto p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-xs text-amber-200 text-left space-y-2.5 animate-fadeIn">
-            <div className="flex items-center space-x-2 font-bold text-amber-300">
-              <Info className="w-4 h-4" />
-              <span>구글 모델 응답 지연 또는 일시적 트래픽 집중 안내</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              구글 Gemini 서버 트래픽이 몰리거나 API 한도 상황일 수 있습니다. 기다리지 않고 즉시 완성된 분석 화면과 북마크 기능을 확인하시려면 아래 버튼을 눌러보세요.
-            </p>
-            <button
-              type="button"
-              onClick={onLoadSampleAnalysis}
-              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center justify-center space-x-2 cursor-pointer shadow-md"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>체험용 샘플 분석 결과로 즉시 확인하기</span>
-            </button>
-          </div>
+        {elapsedSeconds >= 20 && (
+          <p className="text-xs text-slate-400 max-w-md mx-auto" role="status">
+            분석 요청이 계속 진행 중입니다. 완료되면 결과를 표시하며, 시간 초과나 오류가 발생하면 원인을 안내합니다.
+          </p>
         )}
       </div>
     );
