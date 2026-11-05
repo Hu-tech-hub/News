@@ -39,6 +39,7 @@ interface AnalysisViewProps {
   isAnalyzing: boolean;
   progress?: AnalysisProgress[];
   startedAt?: number;
+  durationMs?: number | null;
   onSaveBookmark: () => Promise<void>;
   isBookmarked: boolean;
   onReAnalyzeWithTarget: () => void;
@@ -60,6 +61,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
   isAnalyzing,
   progress = [],
   startedAt = 0,
+  durationMs,
   onSaveBookmark,
   isBookmarked,
   onReAnalyzeWithTarget,
@@ -171,7 +173,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
           <div className="flex items-start space-x-3">
             <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <h2 className="text-base font-bold text-white">기사 분석 알림</h2>
+              <h2 className="text-base font-bold text-white">기사 분석 알림{durationMs != null ? ` · ${Math.ceil(durationMs / 1000)}초 소요` : ''}</h2>
               <p className="text-xs text-amber-300/90 leading-relaxed">
                 {errorMessage ||
                   '웹사이트 보안 정책(봇 차단, 유료벽 등) 또는 모델 응답 지연으로 인해 분석을 완료하지 못했습니다.'}
@@ -364,6 +366,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
           </div>
           <span className="text-[11px] text-slate-400">
             분석 시각: {formatToKST(analysis.analyzedAt, 'datetime')} ({analysis.modelId})
+            {durationMs != null && <span> · 총 {Math.ceil(durationMs / 1000)}초 소요</span>}
           </span>
         </div>
       </div>

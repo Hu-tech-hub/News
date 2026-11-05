@@ -55,6 +55,7 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState<string | undefined>(undefined);
   const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress[]>([]);
   const [analysisStartedAt, setAnalysisStartedAt] = useState(0);
+  const [analysisDurationMs, setAnalysisDurationMs] = useState<number | null>(null);
   const [requestTarget, setRequestTarget] = useState<TargetProfile | null>(null);
   const analysisRequest = useRef<AbortController | null>(null);
 
@@ -168,7 +169,9 @@ export default function App() {
     const controller = new AbortController();
     analysisRequest.current = controller;
     setRequestTarget(selectedTarget);
-    setAnalysisStartedAt(Date.now());
+    const requestStartedAt = Date.now();
+    setAnalysisStartedAt(requestStartedAt);
+    setAnalysisDurationMs(null);
     setAnalysisProgress([{ stage: 'receiving', elapsedMs: 0 }]);
     setCurrentAnalysis(null);
     setCurrentSources([]);
@@ -192,7 +195,7 @@ export default function App() {
         inputType: params.inputType,
       }, (progress) => {
         if (analysisRequest.current !== controller) return;
-        setAnalysisProgress((previous) => previous.some((item) => item.stage === progress.stage) ? previous : [...previous, progress]);
+        setAnalysisProgress((previous) => previous.some((item) => item.stage === progress.stage) ? previous : [...previous, { ...progress, elapsedMs: Date.now() - requestStartedAt }]);
       }, controller.signal);
 
       if (analysisRequest.current !== controller) return;
@@ -221,7 +224,10 @@ export default function App() {
       if (analysisRequest.current !== controller) return;
       setAnalysisError(err instanceof Error ? err.message : '분석 처리 중 오류가 발생했습니다.');
     } finally {
-      if (analysisRequest.current === controller) setIsAnalyzing(false);
+      if (analysisRequest.current === controller) {
+        setAnalysisDurationMs(Date.now() - requestStartedAt);
+        setIsAnalyzing(false);
+      }
     }
   };
 
@@ -238,6 +244,7 @@ export default function App() {
 
   // Load sample grounded analysis immediately to verify full UI flow
   const handleLoadSampleAnalysis = () => {
+    setAnalysisDurationMs(null);
     analysisRequest.current?.abort();
     analysisRequest.current = null;
     const seed = SEED_BOOKMARKS[0];
@@ -335,6 +342,7 @@ export default function App() {
 
   // Load Seed Demo Data
   const handleLoadDemoData = async () => {
+    setAnalysisDurationMs(null);
     for (const t of SEED_TARGETS) {
       await saveTarget(t);
     }
@@ -415,6 +423,7 @@ export default function App() {
             isAnalyzing={isAnalyzing}
             progress={analysisProgress}
             startedAt={analysisStartedAt}
+            durationMs={analysisDurationMs}
             onSaveBookmark={handleSaveBookmark}
             isBookmarked={isCurrentBookmarked}
             onReAnalyzeWithTarget={handleReAnalyzeWithTarget}
