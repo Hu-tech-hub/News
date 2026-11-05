@@ -17,6 +17,7 @@ apiRouter.get('/system-status', (_req: Request, res: Response) => {
   res.json({
     geminiConfigured: geminiReady,
     model: SERVER_CONFIG.GEMINI_MODEL,
+    searchModel: SERVER_CONFIG.GEMINI_SEARCH_MODEL,
     adkPackage: SERVER_CONFIG.ADK_PACKAGE,
     adkVersion: SERVER_CONFIG.ADK_VERSION,
     promptVersion: SERVER_CONFIG.PROMPT_VERSION,

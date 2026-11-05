@@ -20,6 +20,7 @@ export class ApiError extends Error {
 export interface SystemStatusResponse {
   geminiConfigured: boolean;
   model: string;
+  searchModel?: string;
   adkPackage: string;
   adkVersion: string;
   promptVersion: string;

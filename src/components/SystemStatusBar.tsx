@@ -26,7 +26,7 @@ export const SystemStatusBar: React.FC<SystemStatusBarProps> = ({ status, onLoad
               }`}
             />
             <span className="font-semibold text-slate-300">
-              {status?.model || 'Gemini'}: {status?.geminiConfigured ? '연동 완료' : 'API 키 미설정 (Secrets 패널 필요)'}
+              {status ? `검색 ${status.searchModel || status.model} · 분석 ${status.model}` : 'Gemini'}: {status ? (status.geminiConfigured ? 'API 키 설정됨' : 'API 키 미설정 (서버 환경변수 확인)') : '서버 상태 확인 중'}
             </span>
           </div>
 

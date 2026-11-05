@@ -225,10 +225,10 @@ export async function searchRealNews(params: {
   const searchExecutionPromise = (async () => {
     try {
       totalSearchApiCalls++;
-      console.log(`[뉴스 찾기 API 호출 #${totalSearchApiCalls}] 모델: ${SERVER_CONFIG.GEMINI_MODEL}, 메서드: generateContent, 도구: googleSearch`);
+      console.log(`[뉴스 찾기 API 호출 #${totalSearchApiCalls}] 모델: ${SERVER_CONFIG.GEMINI_SEARCH_MODEL}, 메서드: generateContent, 도구: googleSearch`);
 
       const response = await ai.models.generateContent({
-        model: SERVER_CONFIG.GEMINI_MODEL,
+        model: SERVER_CONFIG.GEMINI_SEARCH_MODEL,
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
@@ -307,7 +307,7 @@ export async function searchRealNews(params: {
       };
     } catch (err: unknown) {
       const quotaDiag = parseGeminiQuotaError(err, {
-        modelUsed: SERVER_CONFIG.GEMINI_MODEL,
+        modelUsed: SERVER_CONFIG.GEMINI_SEARCH_MODEL,
         apiMethod: 'ai.models.generateContent',
         usedSearchTool: true,
       });
