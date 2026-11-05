@@ -178,6 +178,8 @@ export async function runStructuredAnalysis(params: {
 4. AI 생성 예상 면접 질문 (interviewQuestions):
    - 기사 사실과 지원 직무(${params.targetRole})를 엮어 면접관이 질문할 수 있는 모의 질문 3~4개를 작성하세요.
    - 이는 "AI가 생성한 모의 면접 질문"이며 실제 기출 문제가 아님을 명확히 하고, 질문 의도(intent)와 sourceId="${params.sourceId}", focusArea를 명시하세요.
+   - 각 질문에 answerGuide를 포함하세요: opening은 면접에서 답변을 시작할 핵심 입장 1문장, keyPoints는 해당 질문에 직접 답하는 핵심 포인트 2~3개(각 1문장), experienceTip은 지원자가 자신의 경험을 연결할 방법 1문장입니다.
+   - 기사에서 확인된 사실과 제안하는 접근 방법을 구분하고, 지원자의 경험·성과·기업 내부 수치나 기술 사실을 지어내지 마세요. 개인 경험이 필요한 부분은 [본인 경험]으로 표시하세요. 전체 답변 가이드는 질문당 250자 안팎으로 간결하게 작성하세요.
 5. 확인 필요 사항 (uncertainties):
    - 기사 내용만으로는 확인되지 않아 추가 조사가 필요한 부분이나 의문점을 명시하세요.
 
@@ -254,8 +256,17 @@ ${params.articleText}
                   intent: { type: Type.STRING, description: '면접관의 질문 의도' },
                   sourceId: { type: Type.STRING, description: '연관 sourceId' },
                   focusArea: { type: Type.STRING, description: 'tech | process | industry_trend | company_strategy' },
+                  answerGuide: {
+                    type: Type.OBJECT,
+                    properties: {
+                      opening: { type: Type.STRING, description: '질문에 직접 답하는 핵심 입장 1문장' },
+                      keyPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: '기사 근거 및 직무 대응 방안 2~3개. 각 1문장' },
+                      experienceTip: { type: Type.STRING, description: '[본인 경험]을 연결하는 방법 1문장. 경험이나 성과를 창작하지 않음' },
+                    },
+                    required: ['opening', 'keyPoints', 'experienceTip'],
+                  },
                 },
-                required: ['question', 'intent', 'sourceId', 'focusArea'],
+                required: ['question', 'intent', 'sourceId', 'focusArea', 'answerGuide'],
               },
             },
             uncertainties: {

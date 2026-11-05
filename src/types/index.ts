@@ -55,6 +55,11 @@ export interface InterviewQuestionItem {
   intent: string;
   sourceId: string;
   focusArea: 'tech' | 'process' | 'industry_trend' | 'company_strategy';
+  answerGuide?: {
+    opening: string;
+    keyPoints: string[];
+    experienceTip: string;
+  };
 }
 
 export interface AnalysisResult {

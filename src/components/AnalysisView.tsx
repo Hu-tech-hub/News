@@ -489,24 +489,54 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {analysis.interviewQuestions.map((q, idx) => (
-            <div key={idx} className="p-4 rounded-2xl bg-slate-800/40 border border-slate-800 space-y-2.5 flex flex-col justify-between">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
+          {analysis.interviewQuestions.map((q, idx) => {
+            const implication = analysis.implications.find((item) => item.sourceId === q.sourceId);
+            const fact = analysis.summaryItems.find((item) => item.sourceId === q.sourceId);
+            const guide = q.answerGuide || {
+              opening: '결론 → 기사 근거 → 직무 대응 → 본인 경험 순서로 답변을 구성하세요.',
+              keyPoints: [
+                fact ? `기사 근거: ${fact.factText}` : `질문 의도: ${q.intent}`,
+                implication ? `직무 연결: ${implication.jobRoleChallenge}` : `${analysis.targetSnapshot.jobRole} 관점에서 실행할 방법과 확인할 지표를 제시하세요.`,
+              ],
+              experienceTip: '[본인 경험]에서 본인의 역할·행동·결과를 한 가지씩 연결하세요. 경험하지 않은 성과는 만들지 마세요.',
+            };
+            return (
+            <details key={`${q.question}-${idx}`} className="group rounded-2xl bg-slate-800/40 border border-slate-800 open:border-purple-500/40">
+              <summary className="list-none cursor-pointer p-4 space-y-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-2xl [&::-webkit-details-marker]:hidden">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-bold text-purple-400 uppercase">Q{idx + 1}. 연습 질문</span>
                   <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md font-mono">
                     {q.focusArea}
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-white leading-snug">{q.question}</h3>
-              </div>
+                <span className="flex items-center gap-1 text-xs font-medium text-purple-300">
+                  <span className="group-open:hidden">답변 핵심 보기</span>
+                  <span className="hidden group-open:inline">답변 핵심 접기</span>
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
 
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-1">
+              <div className="px-4 pb-4 space-y-3">
+                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-1">
                 <span className="font-semibold text-slate-300 block">면접관의 질문 의도:</span>
                 <p>{q.intent}</p>
+                </div>
+                <div className="border-t border-slate-700/60 pt-3 space-y-2.5 text-xs leading-relaxed">
+                  <p className="font-semibold text-purple-200">답변 방향</p>
+                  <p className="text-slate-200">{guide.opening}</p>
+                  <ul className="list-disc space-y-1.5 pl-4 text-slate-300">
+                    {guide.keyPoints.slice(0, 3).map((point, pointIdx) => <li key={pointIdx}>{point}</li>)}
+                  </ul>
+                  <p className="rounded-lg bg-purple-500/10 p-2.5 text-purple-200">{guide.experienceTip}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {q.answerGuide ? 'AI 답변 가이드입니다. 기사 사실과 본인의 실제 경험을 확인해 활용하세요.' : '기존 분석의 기사 근거·직무 시사점으로 구성했습니다. 재분석하면 질문별 AI 답변 가이드가 생성됩니다.'}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            </details>
+            );
+          })}
         </div>
       </div>
 
