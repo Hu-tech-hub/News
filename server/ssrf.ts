@@ -78,7 +78,7 @@ function findMarkedArticleBody(html: string): string | undefined {
 
 function cleanHtmlToText(html: string): { title: string; text: string } {
   // Extract title tag
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
   let title = titleMatch ? titleMatch[1].trim() : '';
   title = title.replace(/\s+/g, ' ');
 
