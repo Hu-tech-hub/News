@@ -61,6 +61,21 @@ export async function validateSafeUrl(urlStr: string): Promise<{ safe: boolean; 
   return { safe: true, urlObj };
 }
 
+function findMarkedArticleBody(html: string): string | undefined {
+  const start = /<(article|div|section)\b[^>]*\s(?:itemprop\s*=\s*["']articleBody["']|id\s*=\s*["']article-view-content-div["'])[^>]*>/i.exec(html);
+  if (!start) return;
+
+  const offset = start.index + start[0].length;
+  const tag = start[1];
+  const tags = new RegExp('</?' + tag + '\\b[^>]*>', 'gi');
+  tags.lastIndex = offset;
+  let depth = 1;
+  for (let match = tags.exec(html); match; match = tags.exec(html)) {
+    depth += match[0].startsWith('</') ? -1 : 1;
+    if (depth === 0) return html.slice(offset, match.index);
+  }
+}
+
 function cleanHtmlToText(html: string): { title: string; text: string } {
   // Extract title tag
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -79,10 +94,12 @@ function cleanHtmlToText(html: string): { title: string; text: string } {
     .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
     .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ');
 
-  // Look for common article containers (e.g. article, id="articleBody", etc.)
-  const articleMatch = cleaned.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
-  if (articleMatch && articleMatch[1].length > 200) {
-    cleaned = articleMatch[1];
+  const markedBody = findMarkedArticleBody(cleaned);
+  if (markedBody) {
+    cleaned = markedBody;
+  } else {
+    const articleMatch = cleaned.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+    if (articleMatch && articleMatch[1].length > 200) cleaned = articleMatch[1];
   }
 
   // Replace block tags with newlines
