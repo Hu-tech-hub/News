@@ -4,6 +4,7 @@
  */
 
 import dns from 'node:dns/promises';
+import { extractArticleText } from './article-text.js';
 import { SERVER_CONFIG } from './config.js';
 import { resolveGoogleNewsUrl } from './google-news.js';
 
@@ -59,70 +60,6 @@ export async function validateSafeUrl(urlStr: string): Promise<{ safe: boolean; 
   }
 
   return { safe: true, urlObj };
-}
-
-function findMarkedArticleBody(html: string): string | undefined {
-  const start = /<(article|div|section)\b[^>]*\s(?:itemprop\s*=\s*["']articleBody["']|id\s*=\s*["']article-view-content-div["'])[^>]*>/i.exec(html);
-  if (!start) return;
-
-  const offset = start.index + start[0].length;
-  const tag = start[1];
-  const tags = new RegExp('</?' + tag + '\\b[^>]*>', 'gi');
-  tags.lastIndex = offset;
-  let depth = 1;
-  for (let match = tags.exec(html); match; match = tags.exec(html)) {
-    depth += match[0].startsWith('</') ? -1 : 1;
-    if (depth === 0) return html.slice(offset, match.index);
-  }
-}
-
-function cleanHtmlToText(html: string): { title: string; text: string } {
-  // Extract title tag
-  const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
-  let title = titleMatch ? titleMatch[1].trim() : '';
-  title = title.replace(/\s+/g, ' ');
-
-  // Remove scripts, styles, noscripts, iframes, svgs, header, footer, nav
-  let cleaned = html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, ' ')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, ' ')
-    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
-    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
-    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
-    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
-    .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ');
-
-  const markedBody = findMarkedArticleBody(cleaned);
-  if (markedBody) {
-    cleaned = markedBody;
-  } else {
-    const articleMatch = cleaned.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
-    if (articleMatch && articleMatch[1].length > 200) cleaned = articleMatch[1];
-  }
-
-  // Replace block tags with newlines
-  cleaned = cleaned.replace(/<(?:p|div|br|h1|h2|h3|h4|h5|h6|li|tr)[^>]*>/gi, '\n');
-  // Strip all other HTML tags
-  cleaned = cleaned.replace(/<[^>]+>/g, ' ');
-  // Decode basic HTML entities
-  cleaned = cleaned
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-
-  // Normalize whitespace
-  const lines = cleaned
-    .split('\n')
-    .map((l) => l.trim().replace(/\s+/g, ' '))
-    .filter((l) => l.length > 0);
-
-  const text = lines.join('\n');
-  return { title, text };
 }
 
 export async function fetchSafeArticle(
@@ -196,7 +133,9 @@ export async function fetchSafeArticle(
     const decoder = new TextDecoder('utf-8');
     const html = decoder.decode(arrayBuffer);
 
-    const { title, text } = cleanHtmlToText(html);
+    const { title, text } = contentType.includes('text/plain')
+      ? { title: '', text: html.trim() }
+      : extractArticleText(html);
 
     if (text.length < 100) {
       return {
