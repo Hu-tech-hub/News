@@ -1,3 +1,4 @@
+import { ArticleSummary } from './ArticleSummary';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -17,7 +18,6 @@ import {
   Download,
   Upload,
   X,
-  Quote,
   Sparkles,
   Save,
   Clock,
@@ -406,20 +406,7 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
                 />
               </div>
 
-              {/* Core Facts Summary */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  기사 핵심 요약 사실
-                </h3>
-                {activeBookmarkModal.summaryItems.map((item, idx) => (
-                  <div key={idx} className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-800 space-y-1.5">
-                    <p className="text-xs text-slate-100 font-medium">{item.factText}</p>
-                    {item.quoteSnippet && (
-                      <p className="text-[11px] text-slate-400 italic">"{item.quoteSnippet}"</p>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <ArticleSummary overview={activeBookmarkModal.articleOverview} items={activeBookmarkModal.summaryItems} />
 
               {/* Tailored Implications */}
               <div className="space-y-3">

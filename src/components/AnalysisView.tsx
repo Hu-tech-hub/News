@@ -1,3 +1,4 @@
+import { ArticleSummary } from './ArticleSummary';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -18,7 +19,6 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
-  Quote,
   ShieldCheck,
   ArrowRight,
   Info,
@@ -371,36 +371,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({
         </div>
       </div>
 
-      {/* SECTION A: 기사 핵심 요약 (사실 수치 보존) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h2 className="text-base font-bold text-white flex items-center space-x-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>기사에서 확인한 사실 (핵심 요약)</span>
-          </h2>
-          <span className="text-xs text-slate-400">수치·일정 보존 및 원문 대조</span>
-        </div>
-
-        <div className="space-y-3">
-          {analysis.summaryItems.map((item, idx) => (
-            <div key={idx} className="p-4 rounded-2xl bg-slate-800/40 border border-slate-800 space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-slate-100 font-medium leading-relaxed">{item.factText}</p>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
-                  {item.sourceId}
-                </span>
-              </div>
-
-              {item.quoteSnippet && (
-                <div className="flex items-start space-x-2 text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
-                  <Quote className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                  <span className="italic">"{item.quoteSnippet}"</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <ArticleSummary overview={analysis.articleOverview} items={analysis.summaryItems} />
 
       {/* SECTION B: 자동 분류 태그 */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-sm">

@@ -46,6 +46,16 @@ export interface SummaryFactItem {
   factText: string;
   sourceId: string;
   quoteSnippet?: string;
+  label?: string;
+  layout?: 'card' | 'metric' | 'timeline' | 'table';
+  value?: string;
+  status?: '확인된 사실' | '발표된 계획' | '논의' | '전망' | '조사 중';
+}
+
+export interface ArticleOverview {
+  type: '사건·사고' | '실적·시장 동향' | '기업 전략·기술 발표' | '정책·제도' | '협력·계약·인수' | '연구·전망·의견';
+  takeaway: string;
+  context?: string;
 }
 
 export interface ImplicationItem {
@@ -69,6 +79,7 @@ export interface InterviewQuestionItem {
 }
 
 export interface AnalysisResult {
+  articleOverview?: ArticleOverview;
   industryTags: string[];
   companyTags: string[];
   issueTags: string[];
@@ -88,6 +99,7 @@ export interface AnalysisResult {
 }
 
 export interface Bookmark {
+  articleOverview?: ArticleOverview;
   id: string;
   title: string;
   sourceUrl: string | null;

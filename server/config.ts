@@ -6,7 +6,7 @@
 export const SERVER_CONFIG = {
   // Lowest-cost stable Gemini model for text analysis.
   GEMINI_MODEL: 'gemini-3.1-flash-lite',
-  PROMPT_VERSION: 'v1.4.0-role-specific-interviews',
+  PROMPT_VERSION: 'v1.6.0-article-layouts',
   
   // Timeouts (milliseconds)
   SEARCH_TIMEOUT_MS: 18000,

@@ -173,8 +173,15 @@ ${/품질\s*(관리|보증)|\bQC\b|\bQA\b/i.test(params.targetRole) ? `- 이번 
 
 [분석 요구사항]
 1. 기사 핵심 요약 (summaryItems):
-   - 기사에서 확인 가능한 핵심 사실들을 정리하세요. 수치, 일정, 명칭을 보존하세요.
-   - 각 사실마다 sourceId="${params.sourceId}"를 지정하고, 실제 본문에서 발췌한 짧은 구절(quoteSnippet)을 연결하세요.
+   - articleOverview에 기사의 중심 유형, 핵심 문장(takeaway), 이해에 필요한 일시·장소·참여자 등 배경(context)을 담으세요. 기사 자체의 사실과 주제를 기준으로 작성하고 지원 기업·직무에 맞춰 요약 내용을 바꾸지 마세요.
+   - 6하원칙으로 중요 사실을 확인하고, 주 유형에 맞춰 설명을 구성하세요. 사건·사고는 발생→확인된 원인→영향→대응, 실적·시장은 지표→변화→비교 기준과 배경, 전략·기술은 배경→전략→실행 방식→근거와 진행 상태, 정책은 변경 내용→적용 대상→시행 시점→영향, 협력·계약은 참여자→역할→합의 범위→다음 단계, 연구·전망은 주장→근거·가정→한계 순서로 구성하세요. 기사에 없는 내용은 채우지 마세요.
+   - 각 항목의 label은 짧은 제목, factText는 핵심과 맥락을 이해할 수 있는 충분한 설명입니다. layout은 일반 설명 card, 핵심 지표 metric, 확인된 시간 순서 timeline, 역할·조건 비교 table 중 고르세요. metric의 value에는 단위가 있는 원문 수치를, timeline의 value에는 원문에 나온 일시를 넣으세요. timeline은 시간순으로 반환하세요. status는 사실, 계획, 논의, 전망, 조사 중을 구분하세요.
+   - 주 유형 외의 중요한 내용도 알맞은 블록으로 포함하세요. 예를 들어 전략 발표 기사에 실적 수치가 나오면 지표로, 업계 협력 논의가 나오면 참석 주체와 논의 범위를 별도로 담으세요.
+   - 기사 전체를 먼저 읽고 중심 사건, 발표·전략의 내용과 배경, 이를 뒷받침하는 실적·지표, 주요 협력·후속 계획 등 실제로 등장하는 핵심 주제를 파악하세요. 지원 기업·직무와 직접 관련이 약해도 기사 이해에 필요한 주제는 포함하세요.
+   - 서로 다른 핵심 주제는 별도 항목으로 정리하세요. 여러 주제가 있는 기사는 보통 4~6개를 목표로 하되, 짧거나 단일 주제인 기사에는 반복이나 부차적인 세부 사항을 채워 넣지 마세요.
+   - 핵심 수치의 단위, 기간, 비교 기준을 보존하세요. 판매량·증감과 판매 비중처럼 각각 의미가 있는 지표를 함께 제시했다면 빠뜨리지 마세요. 발표된 계획, 논의 사항, 이미 발생한 실적을 구분하세요.
+   - 각 항목에 sourceId="${params.sourceId}"를 지정하고, 주장 전체를 직접 뒷받침하는 연속된 원문 구절(quoteSnippet)을 그대로 발췌하세요. 한 구절로 뒷받침하기 어려운 별개의 주장은 나누세요.
+   - 출력 전 기사 앞부분과 뒷부분의 핵심 주제 및 수치가 빠지지 않았는지, 각 인용이 대응하는 사실을 뒷받침하는지 확인하세요. 사진 설명과 반복 문구는 생략하세요.
 2. 자동 분류 (industryTags, companyTags, issueTags):
    - 산업 태그는 반도체, 제조, IT, 자동차 등 복수 선택 가능합니다.
    - 관련 기업 태그, 핵심 이슈 태그를 추출하세요.
@@ -214,6 +221,15 @@ ${params.articleText}
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            articleOverview: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING, enum: ['사건·사고', '실적·시장 동향', '기업 전략·기술 발표', '정책·제도', '협력·계약·인수', '연구·전망·의견'] },
+                takeaway: { type: Type.STRING, description: '기사를 관통하는 근거 있는 핵심 문장' },
+                context: { type: Type.STRING, description: '기사 이해에 필요한 확인된 배경' },
+              },
+              required: ['type', 'takeaway'],
+            },
             industryTags: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
@@ -231,14 +247,19 @@ ${params.articleText}
             },
             summaryItems: {
               type: Type.ARRAY,
+              description: '기사 전체의 서로 다른 핵심 주제별 사실과 근거. 여러 주제가 있으면 보통 4~6개',
               items: {
                 type: Type.OBJECT,
                 properties: {
                   factText: { type: Type.STRING, description: '기사에서 확인된 구체적 사실 (수치/일정 보존)' },
                   sourceId: { type: Type.STRING, description: '근거가 되는 sourceId' },
                   quoteSnippet: { type: Type.STRING, description: '본문 원문 발췌 구절' },
+                  label: { type: Type.STRING, description: '항목의 짧은 제목' },
+                  layout: { type: Type.STRING, enum: ['card', 'metric', 'timeline', 'table'] },
+                  value: { type: Type.STRING, description: '지표 수치와 단위, 또는 타임라인의 일시' },
+                  status: { type: Type.STRING, enum: ['확인된 사실', '발표된 계획', '논의', '전망', '조사 중'] },
                 },
-                required: ['factText', 'sourceId'],
+                required: ['factText', 'sourceId', 'quoteSnippet', 'label', 'layout', 'status'],
               },
             },
             implications: {
@@ -284,6 +305,7 @@ ${params.articleText}
             },
           },
           required: [
+            'articleOverview',
             'industryTags',
             'companyTags',
             'issueTags',
@@ -298,12 +320,21 @@ ${params.articleText}
 
     const rawJson = (response.text || '{}').trim();
     const parsed = JSON.parse(rawJson);
+    const articleForQuoteCheck = params.articleText.replace(/\s+/g, ' ').trim();
+    const summaryItems = (parsed.summaryItems as AnalysisResult['summaryItems'] | undefined ?? []).map((item) => {
+      const quote = typeof item.quoteSnippet === 'string' ? item.quoteSnippet.replace(/\s+/g, ' ').trim() : '';
+      return {
+        ...item,
+        quoteSnippet: quote && articleForQuoteCheck.includes(quote) ? item.quoteSnippet : undefined,
+      };
+    });
 
     return {
+      articleOverview: parsed.articleOverview,
       industryTags: parsed.industryTags || [],
       companyTags: parsed.companyTags || [],
       issueTags: parsed.issueTags || [],
-      summaryItems: parsed.summaryItems || [],
+      summaryItems,
       implications: parsed.implications || [],
       interviewQuestions: parsed.interviewQuestions || [],
       uncertainties: parsed.uncertainties || [],
