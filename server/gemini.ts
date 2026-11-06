@@ -177,6 +177,7 @@ ${/품질\s*(관리|보증)|\bQC\b|\bQA\b/i.test(params.targetRole) ? `- 이번 
    - 6하원칙으로 중요 사실을 확인하고, 주 유형에 맞춰 설명을 구성하세요. 사건·사고는 발생→확인된 원인→영향→대응, 실적·시장은 지표→변화→비교 기준과 배경, 전략·기술은 배경→전략→실행 방식→근거와 진행 상태, 정책은 변경 내용→적용 대상→시행 시점→영향, 협력·계약은 참여자→역할→합의 범위→다음 단계, 연구·전망은 주장→근거·가정→한계 순서로 구성하세요. 기사에 없는 내용은 채우지 마세요.
    - 각 항목의 label은 짧은 제목, factText는 핵심과 맥락을 이해할 수 있는 충분한 설명입니다. layout은 일반 설명 card, 핵심 지표 metric, 확인된 시간 순서 timeline, 역할·조건 비교 table 중 고르세요. metric의 value에는 단위가 있는 원문 수치를, timeline의 value에는 원문에 나온 일시를 넣으세요. timeline은 시간순으로 반환하세요. status는 사실, 계획, 논의, 전망, 조사 중을 구분하세요.
    - 주 유형 외의 중요한 내용도 알맞은 블록으로 포함하세요. 예를 들어 전략 발표 기사에 실적 수치가 나오면 지표로, 업계 협력 논의가 나오면 참석 주체와 논의 범위를 별도로 담으세요.
+   - 원문에 연도가 없으면 날짜에 연도를 붙이지 마세요. '올해', '지난 4일'처럼 상대적인 시점은 원문 표현을 유지하세요.
    - 기사 전체를 먼저 읽고 중심 사건, 발표·전략의 내용과 배경, 이를 뒷받침하는 실적·지표, 주요 협력·후속 계획 등 실제로 등장하는 핵심 주제를 파악하세요. 지원 기업·직무와 직접 관련이 약해도 기사 이해에 필요한 주제는 포함하세요.
    - 서로 다른 핵심 주제는 별도 항목으로 정리하세요. 여러 주제가 있는 기사는 보통 4~6개를 목표로 하되, 짧거나 단일 주제인 기사에는 반복이나 부차적인 세부 사항을 채워 넣지 마세요.
    - 핵심 수치의 단위, 기간, 비교 기준을 보존하세요. 판매량·증감과 판매 비중처럼 각각 의미가 있는 지표를 함께 제시했다면 빠뜨리지 마세요. 발표된 계획, 논의 사항, 이미 발생한 실적을 구분하세요.
@@ -321,16 +322,24 @@ ${params.articleText}
     const rawJson = (response.text || '{}').trim();
     const parsed = JSON.parse(rawJson);
     const articleForQuoteCheck = params.articleText.replace(/\s+/g, ' ').trim();
+    const hasUnsupportedYear = (value?: string) =>
+      [...(value || '').matchAll(/\b((?:19|20)\d{2})(?=\s*년|[-./]\d{1,2}[-./]\d{1,2})/g)]
+        .some(([, year]) => !new RegExp(`\\b${year}\\b`).test(params.articleText));
+    const overview = parsed.articleOverview as AnalysisResult['articleOverview'];
     const summaryItems = (parsed.summaryItems as AnalysisResult['summaryItems'] | undefined ?? []).map((item) => {
       const quote = typeof item.quoteSnippet === 'string' ? item.quoteSnippet.replace(/\s+/g, ' ').trim() : '';
       return {
         ...item,
+        value: hasUnsupportedYear(item.value) ? undefined : item.value,
         quoteSnippet: quote && articleForQuoteCheck.includes(quote) ? item.quoteSnippet : undefined,
       };
     });
 
     return {
-      articleOverview: parsed.articleOverview,
+      articleOverview: overview && !hasUnsupportedYear(overview.takeaway) ? {
+        ...overview,
+        context: hasUnsupportedYear(overview.context) ? undefined : overview.context,
+      } : undefined,
       industryTags: parsed.industryTags || [],
       companyTags: parsed.companyTags || [],
       issueTags: parsed.issueTags || [],
